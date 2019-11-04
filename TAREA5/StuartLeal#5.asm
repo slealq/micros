@@ -132,6 +132,8 @@ config_l2:              fcc 'INGRESE CPROG.'
                         movb #10 Cont_Reb
 
                         ;; llamar LCD
+                        ldx #config_l1
+                        ldy #config_l2
                         jsr LCD    
 
                         ;; llamar a BIN_BCD
@@ -567,7 +569,8 @@ SE_cmd_l_en             bset PORTK,$02
 
 ;; ==================== Subrutina LCD ========================================
 
-LCD                     ldab #1
+LCD                     pshx
+                        ldab #1
 
 LC_tst_fin              ldaa iniDISP
                         inca
@@ -596,10 +599,9 @@ LC_clr                  ldaa Clear_LCD
 
                         movb D2ms Cont_Delay
 
-                        jsr DELAY
+                        pulx
 
-                        ldx #config_l1
-                        ldy #config_l2
+                        jsr DELAY
 
                         jsr Cargar_LCD
 
