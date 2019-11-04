@@ -1,6 +1,6 @@
 ;; ===========================================================================
 ;; Autor: Stuart Leal Q
-;; Fecha: 25 de Octubre de 2019
+;; Fecha: 5 de noviembre de 2019
 ;; Version: 1.0
 ;; ===========================================================================
 
@@ -27,7 +27,7 @@ Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 Cuenta:                 ds 1
 Acumul:                 ds 1
 CPROG:                  ds 1
-VMAX:                   db 0
+VMAX:                   db 250
 TIMER_CUENTA:           ds 1
 LEDS:                   db 1
 BRILLO:                 db 50
@@ -163,6 +163,9 @@ MN_RUN_first            ldx #run_l1
                         bclr Banderas,$20
                         movb #$01 LEDS
                         movb #$0F PIEH
+                        
+                        clr ACUMUL
+                        clr CUENTA
 
 MN_jsr_run              jsr MODO_RUN
 
@@ -172,15 +175,20 @@ MN_CFG_check_first      brclr Banderas,$20,MN_CFG_first
 
                         bra MN_jsr_config
 
+MN_check_cprog_local    bra MN_check_cprog
+
 MN_CFG_first            ldx #config_l1
                         ldy #config_l2
 
                         jsr LCD
 
                         bset Banderas,$20
-                        movb #$FF BIN2                        
+                        movb #$FF BIN2
+                        movb CPROG BIN1
                         movb #$02 LEDS
                         movb #$0C PIEH
+
+                        bclr PORTE,$04
 
                         ;; borrar num_array con FF - BEGIN
                         bclr Banderas,$04
@@ -205,11 +213,11 @@ MN_jsr_bin_bcd          jsr BIN_BCD
 
                         bset Banderas,$10
 
-                        bra MN_check_cprog
+                        bra MN_check_cprog_local
 
 MN_set_md_run           bclr Banderas,$10
 
-                        bra MN_check_cprog                                            
+                        bra MN_check_cprog_local                                            
 
 MN_fin                  bra *
 
@@ -397,7 +405,32 @@ FA_Return               rts
 
 ;; ==================== Subrutina MODO_RUN ===================================
 
-MODO_RUN                rts
+MODO_RUN                ldaa CUENTA
+                        cmpa CPROG
+
+                        beq MR_update_and_return
+
+                        tst TIMER_CUENTA
+                        beq MR_inc_cuenta
+
+                        bra MR_update_and_return
+
+MR_inc_cuenta           movb VMAX TIMER_CUENTA
+                        inc CUENTA
+                        ldaa CUENTA
+
+                        cmpa CPROG
+                        beq MR_inc_acumul
+
+                        bra MR_update_and_return
+
+MR_inc_acumul           inc ACUMUL
+                        bset PORTE,$04                        
+
+MR_update_and_return    movb CUENTA BIN1
+                        movb ACUMUL BIN2
+
+                        rts                                                       
 
 ;; ==================== Subrutina MODO_CONFIG ================================
 
@@ -761,9 +794,14 @@ CLCD_return             rts
 RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 
                         tst Cont_reb
-                        beq RTI_retornar
+                        beq RTI_check_tmr_cnt
 
                         dec Cont_reb
+
+RTI_check_tmr_cnt       tst TIMER_CUENTA
+                        beq RTI_retornar
+                        
+                        dec TIMER_CUENTA
 
 RTI_retornar            rti       
 
@@ -778,7 +816,8 @@ PH_ISR                  brset PIFH,$01,PH_do_0
                         bra PH_return
 
 PH_do_0                 bset PIFH,$01
-                        clr Cuenta       
+                        clr Cuenta
+                        bclr PORTE,$04       
                         bra PH_return
 
 PH_do_1                 bset PIFH,$02
