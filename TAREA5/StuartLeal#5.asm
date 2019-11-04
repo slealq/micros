@@ -161,6 +161,7 @@ MN_RUN_first            ldx #run_l1
                         bclr Banderas,$20
                         movb #$01 LEDS
                         movb #$FF BIN2
+                        movb #$0F PIEH
 
 MN_jsr_run              jsr MODO_RUN
 
@@ -177,6 +178,7 @@ MN_CFG_first            ldx #config_l1
 
                         bset Banderas,$20
                         movb #$02 LEDS
+                        movb #$0C PIEH
 
 MN_jsr_config           jsr MODO_CONFIG                                                
 
@@ -186,24 +188,11 @@ MN_jsr_bin_bcd          jsr BIN_BCD
 
                         bset Banderas,$10
 
-                        bra MN_check_cont_reb
+                        bra MN_check_cprog
 
 MN_set_md_run           bclr Banderas,$10
 
-MN_check_cont_reb       tst Cont_Reb
-                        beq MN_enable_ph_interrupt
-
-                        bra MN_check_cprog
-
-MN_enable_ph_interrupt  brset Banderas,$10,MN_enable_ph_config
-
-                        movb #$0F PIEH
-
-                        bra MN_check_cprog
-
-MN_enable_ph_config     movb #$0C PIEH
-
-                        bra MN_check_cprog                                                
+                        bra MN_check_cprog                                            
 
 MN_fin                  bra *
 
@@ -775,99 +764,39 @@ RTI_retornar            rti
 
 ;; ==================== Subrutina PH_ISR ===================================== 
 
-PH_ISR                  tst Cont_Reb
-                        beq PH_Check_button
+PH_ISR                  brset PIFH,$01,PH_do_0
+                        brset PIFH,$02,PH_do_1
+                        brset PIFH,$04,PH_do_2
+                        brset PIFH,$08,PH_do_3
 
                         movb #$FF PIFH
-                        bra PH_local_return
-
-PH_Check_button         brset PIFH,$01,PH_save_tecla0
-                        brset PIFH,$02,PH_save_tecla1
-                        brset PIFH,$04,PH_save_tecla2
-                        brset PIFH,$08,PH_save_tecla3
-
-                        movb #$FF Tecla
-                        bra PH_check_rebote
-
-PH_save_tecla0          bset PIFH,$01
-                        movb #0 Tecla
-
-                        bra PH_check_rebote
-
-PH_save_tecla1          bset PIFH,$02
-                        movb #1 Tecla
-
-                        bra PH_check_rebote
-
-PH_save_tecla2          bset PIFH,$04
-                        movb #2 Tecla
-
-                        bra PH_check_rebote                        
-
-PH_save_tecla3          bset PIFH,$08
-                        movb #3 Tecla
-
-PH_check_rebote         brset Banderas,$01,PH_check_same
-
-                        movb Tecla Tecla_in
-                        bset Banderas,$01
-                        movb #10 Cont_Reb
-
-PH_local_return         bra PH_return
-
-PH_check_same           ldaa Tecla_in
-                        cmpa Tecla
-
-                        beq PH_do_action
-
-                        movb #$FF Tecla
-                        movb #$FF Tecla_in
-                        bclr Banderas,$01
-
                         bra PH_return
 
-PH_do_action            tst Tecla
-                        beq PH_do_0
+PH_do_0                 bset PIFH,$01
+                        clr Cuenta       
+                        bra PH_return
 
-                        ldaa Tecla
-                        cmpa #1
-                        beq PH_do_1
+PH_do_1                 bset PIFH,$02
+                        clr Acumul
+                        bra PH_return
 
-                        cmpa #2
-                        beq PH_do_2
-
-                        cmpa #3
-                        beq PH_do_3   
-
-PH_l_clear_and_return   bra PH_clear_and_return                     
-
-PH_do_0                 clr Cuenta       
-                        bra PH_clear_and_return
-
-PH_do_1                 clr Acumul
-                        bra PH_clear_and_return
-
-PH_do_2                 tst BRILLO
-                        beq PH_clear_and_return
+PH_do_2                 bset PIFH,$04
+                        tst BRILLO
+                        beq PH_return
 
                         ldaa BRILLO
                         suba #5
                         staa BRILLO
-                        bra PH_clear_and_return
+                        bra PH_return
 
-PH_do_3                 ldaa BRILLO
+PH_do_3                 bset PIFH,$08
+                        ldaa BRILLO
                         cmpa #100
 
-                        beq PH_clear_and_return
+                        beq PH_return
 
                         adda #5
                         staa BRILLO
-
-PH_clear_and_return     movb #$00 PIEH
-                        movb #100 Cont_Reb
-                        movb #$FF Tecla
-                        movb #$FF Tecla_in
-                        bclr Banderas,$01
 
 PH_return               rti
 
