@@ -24,6 +24,8 @@ Patron:                 ds 1
 Banderas:               ds 1
 Num_Array:              ds 6
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
+Cuenta:                 ds 1
+Acumul:                 ds 1
 CPROG                   ds 1
 LEDS:                   db $ff
 BRILLO:                 db 50
@@ -31,7 +33,7 @@ CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
 DT:                     ds 1
 BIN1:                   db 99
-BIN2:                   db $ff
+BIN2:                   db 14
 LOW:                    ds 1
 BCD1:                   ds 1
 BCD2:                   ds 1
@@ -46,8 +48,8 @@ D2ms:                   db 100
 D260us:                 db 13
 D40us:                  db 2
 Clear_LCD:              db $01
-ADD_L1:                 ds 1
-ADD_L2:                 ds 1
+ADD_L1:                 db $80
+ADD_L2:                 db $C0
 iniDISP:                db $04,$28,$28,$06,$0C
 iniMensajes:
 config_l1:              fcc 'MODO CONFIG'
@@ -64,7 +66,7 @@ config_l2:              fcc 'INGRESE CPROG.'
                         dw RTI_ISR
 
                         org $3e4c
-                        dw PHO_ISR
+                        dw PH_ISR
 
                         org $3E66
                         dw TC4_ISR                        
@@ -92,9 +94,6 @@ config_l2:              fcc 'INGRESE CPROG.'
                         movb #$40 RTICTL    ;; t = 1.024 ms
                         bset CRGINT $80     ;; RTI enable
 
-                        ;; habilitar puerto H boton 0
-                        bset PIEH,$01
-
                         ;; para DDRK -> LCD
                         movb #$FF DDRK 
 
@@ -115,6 +114,12 @@ config_l2:              fcc 'INGRESE CPROG.'
 
                         ;; habilitar puerto p (tierras de disp)
                         movb #$0F DDRP
+
+                        ;; habilitar puerto boton: 0,1,2,3,7 y flanco dec
+                        clr DDRH
+                        movb #$0C PIEH
+                        movb #$F0 PPSH
+                        movb #$FF PIFH
 
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
@@ -155,6 +160,10 @@ MN_Check_CleanFin       cba
                         ;; logica para array_ok
 
 MN_ARRAY_OK             brset Banderas,$04,Skip_tcl_read
+
+                        ;; test ph
+                        bra fin
+                        ;; test ph
 
 Tcl_read                jsr TAREA_TECLADO
 
@@ -609,7 +618,7 @@ LC_clr                  ldaa Clear_LCD
 
 ;; ==================== Subrutina Cargar_LCD =================================
 
-CARGAR_LCD              ldaa #$80
+CARGAR_LCD              ldaa ADD_L1
                         bclr Banderas,$80
 
                         jsr SEND
@@ -633,7 +642,7 @@ CLCD_ld_l1              ldaa 1,x+
 
                         bra CLCD_ld_l1
 
-CLDC_l2                 ldaa #$C0
+CLDC_l2                 ldaa ADD_L2
                         bclr Banderas,$80
 
                         jsr SEND
@@ -670,26 +679,101 @@ RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 
 RTI_retornar            rti       
 
-;; ==================== Subrutina PH0_ISR ==================================== 
+;; ==================== Subrutina PH_ISR ===================================== 
 
-PHO_ISR                 bset PIFH,$01
-                        cli
+PH_ISR                  tst Cont_Reb
+                        beq PH_Check_button
 
-                        bclr Banderas,$04
+                        movb #$FF PIFH
+                        bra PH_local_return
 
-                        clra
-                        ldab #6             ;; limpiar Num_array
-                        ldx #Num_Array
+PH_Check_button         brset PIFH,$01,PH_save_tecla0
+                        brset PIFH,$02,PH_save_tecla1
+                        brset PIFH,$04,PH_save_tecla2
+                        brset PIFH,$08,PH_save_tecla3
 
-PH0_Check_ClearFin      cba
-                        beq PH0_FIN
+                        movb #$FF Tecla
+                        bra PH_check_rebote
 
-                        movb #$FF a,x
-                        inca
+PH_save_tecla0          bset PIFH,$01
+                        movb #0 Tecla
 
-                        bra PH0_Check_ClearFin                              
+                        bra PH_check_rebote
 
-PH0_FIN                 rti
+PH_save_tecla1          bset PIFH,$02
+                        movb #1 Tecla
+
+                        bra PH_check_rebote
+
+PH_save_tecla2          bset PIFH,$04
+                        movb #2 Tecla
+
+                        bra PH_check_rebote                        
+
+PH_save_tecla3          bset PIFH,$08
+                        movb #3 Tecla
+
+PH_check_rebote         brset Banderas,$01,PH_check_same
+
+                        movb Tecla Tecla_in
+                        bset Banderas,$01
+                        movb #10 Cont_Reb
+
+PH_local_return         bra PH_return
+
+PH_check_same           ldaa Tecla_in
+                        cmpa Tecla
+
+                        beq PH_do_action
+
+                        movb #$FF Tecla
+                        movb #$FF Tecla_in
+                        bclr Banderas,$01
+
+                        bra PH_return
+
+PH_do_action            tst Tecla
+                        beq PH_do_0
+
+                        ldaa Tecla
+                        cmpa #1
+                        beq PH_do_1
+
+                        cmpa #2
+                        beq PH_do_2
+
+                        cmpa #3
+                        beq PH_do_3   
+
+PH_l_clear_and_return   bra PH_clear_and_return                     
+
+PH_do_0                 clr Cuenta       
+                        bra PH_clear_and_return
+
+PH_do_1                 clr Acumul
+                        bra PH_clear_and_return
+
+PH_do_2                 tst BRILLO
+                        beq PH_clear_and_return
+
+                        ldaa BRILLO
+                        suba #5
+                        staa BRILLO
+                        bra PH_clear_and_return
+
+PH_do_3                 ldaa BRILLO
+                        cmpa #100
+
+                        beq PH_clear_and_return
+
+                        adda #5
+                        staa BRILLO
+
+PH_clear_and_return     movb #$FF Tecla
+                        movb #$FF Tecla_in
+                        bclr Banderas,$01
+
+PH_return               rti
 
 ;; ==================== Subrutina TC4_ISR ==================================== 
 
