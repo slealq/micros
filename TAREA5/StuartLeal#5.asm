@@ -769,7 +769,9 @@ PH_do_3                 ldaa BRILLO
                         adda #5
                         staa BRILLO
 
-PH_clear_and_return     movb #$FF Tecla
+PH_clear_and_return     movb #$00 PIEH
+                        movb #100 Cont_Reb
+                        movb #$FF Tecla
                         movb #$FF Tecla_in
                         bclr Banderas,$01
 
