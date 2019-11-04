@@ -58,6 +58,12 @@ config_l1:              fcc 'MODO CONFIG'
 config_l2:              fcc 'INGRESE CPROG.'                        
                         db EOM
 
+run_l1:                 fcc 'MODO RUN'                        
+                        db EOM
+
+run_l2:                 fcc 'ACUMUL.-CUENTA'      
+                        db EOM                  
+
 ;; ===========================================================================
 ;; ==================== DECLARACION DE INTERRUPCIONES ========================
 ;; ===========================================================================
@@ -129,6 +135,79 @@ config_l2:              fcc 'INGRESE CPROG.'
                         clr CONT_DIG
                         clr CONT_TICKS
                         movb #5000 CONT_7SEG
+
+                        clr CPROG
+                        clr Acumul
+                        clr Cuenta
+
+                        clr Banderas
+
+                        ;; empieza main
+
+MN_check_cprog          tst CPROG
+                        beq MN_CFG_check_first
+
+                        brset Banderas,$10,MN_CFG_check_first
+
+                        brset Banderas,$20,MN_RUN_first
+
+                        bra MN_jsr_run
+
+MN_RUN_first            ldx #run_l1
+                        ldy #run_l2
+
+                        jsr LCD
+
+                        bclr Banderas,$20
+                        movb #$01 LEDS
+                        movb #$FF BIN2
+
+MN_jsr_run              jsr MODO_RUN
+
+                        bra MN_jsr_bin_bcd
+
+MN_CFG_check_first      brclr Banderas,$20,MN_CFG_first
+
+                        bra MN_jsr_config
+
+MN_CFG_first            ldx #config_l1
+                        ldy #config_l2
+
+                        jsr LCD
+
+                        bset Banderas,$20
+                        movb #$02 LEDS
+
+MN_jsr_config           jsr MODO_CONFIG                                                
+
+MN_jsr_bin_bcd          jsr BIN_BCD
+
+                        brclr PTIH,$80,MN_set_md_run
+
+                        bset Banderas,$10
+
+                        bra MN_check_cont_reb
+
+MN_set_md_run           bclr Banderas,$10
+
+MN_check_cont_reb       tst Cont_Reb
+                        beq MN_enable_ph_interrupt
+
+                        bra MN_check_cprog
+
+MN_enable_ph_interrupt  brset Banderas,$10,MN_enable_ph_config
+
+                        movb #$0F PIEH
+
+                        bra MN_check_cprog
+
+MN_enable_ph_config     movb #$0C PIEH
+
+                        bra MN_check_cprog                                                
+
+MN_fin                  bra *
+
+                        ;; main viejo
 
                         movb #$FF Tecla
                         clr Cont_TCL
@@ -355,6 +434,21 @@ FA_Last_Erase           dec Cont_TCL
                         movb #$FF b,x                                                                                                                
 
 FA_Return               rts
+
+;; ==================== Subrutina MODO_RUN ===================================
+
+MODO_RUN                rts
+
+;; ==================== Subrutina MODO_RUN ===================================
+
+MODO_CONFIG             ldaa Num_Array
+                        cmpa #$FF
+
+                        beq MC_fin
+
+                        movb #1 CPROG
+
+MC_fin                  rts      
 
 ;; ==================== Subrutina BCD_BIN ==================================== 
 
