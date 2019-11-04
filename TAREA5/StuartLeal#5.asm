@@ -144,6 +144,15 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
 
                         clr Banderas
 
+                        movb #$FF Tecla
+                        movb #$FF Tecla_in
+                        clr Cont_TCL
+                        movb #10 Cont_reb
+
+                        ldx #config_l1
+                        ldy #config_l2
+                        jsr LCD
+
                         ;; empieza main
 
 MN_check_cprog          tst CPROG
@@ -158,7 +167,7 @@ MN_check_cprog          tst CPROG
 MN_RUN_first            ldx #run_l1
                         ldy #run_l2
 
-                        jsr LCD
+                        jsr Cargar_LCD
 
                         bclr Banderas,$20
                         movb #$01 LEDS
@@ -180,7 +189,7 @@ MN_check_cprog_local    bra MN_check_cprog
 MN_CFG_first            ldx #config_l1
                         ldy #config_l2
 
-                        jsr LCD
+                        jsr Cargar_LCD
 
                         bset Banderas,$20
                         movb #$FF BIN2
@@ -807,40 +816,47 @@ RTI_retornar            rti
 
 ;; ==================== Subrutina PH_ISR ===================================== 
 
-PH_ISR                  brset PIFH,$01,PH_do_0
+PH_ISR                  tst Cont_reb
+                        beq PH_verify
+
+                        bra PH_return
+
+PH_verify               brset PIFH,$01,PH_do_0
                         brset PIFH,$02,PH_do_1
                         brset PIFH,$04,PH_do_2
                         brset PIFH,$08,PH_do_3
 
                         movb #$FF PIFH
-                        bra PH_return
+                        bra PH_return_cnt
 
 PH_do_0                 bset PIFH,$01
                         clr Cuenta
                         bclr PORTE,$04       
-                        bra PH_return
+                        bra PH_return_cnt
 
 PH_do_1                 bset PIFH,$02
                         clr Acumul
-                        bra PH_return
+                        bra PH_return_cnt
 
 PH_do_2                 bset PIFH,$04
                         tst BRILLO
-                        beq PH_return
+                        beq PH_return_cnt
 
                         ldaa BRILLO
                         suba #5
                         staa BRILLO
-                        bra PH_return
+                        bra PH_return_cnt
 
 PH_do_3                 bset PIFH,$08
                         ldaa BRILLO
                         cmpa #100
 
-                        beq PH_return
+                        beq PH_return_cnt
 
                         adda #5
                         staa BRILLO
+
+PH_return_cnt           movb #10 Cont_reb                        
 
 PH_return               rti
 
