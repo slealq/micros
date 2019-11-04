@@ -26,8 +26,10 @@ Num_Array:              ds 6
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 Cuenta:                 ds 1
 Acumul:                 ds 1
-CPROG                   ds 1
-LEDS:                   db $ff
+CPROG:                  ds 1
+VMAX:                   db 0
+TIMER_CUENTA:           ds 1
+LEDS:                   db 1
 BRILLO:                 db 50
 CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
@@ -160,7 +162,6 @@ MN_RUN_first            ldx #run_l1
 
                         bclr Banderas,$20
                         movb #$01 LEDS
-                        movb #$FF BIN2
                         movb #$0F PIEH
 
 MN_jsr_run              jsr MODO_RUN
@@ -177,8 +178,24 @@ MN_CFG_first            ldx #config_l1
                         jsr LCD
 
                         bset Banderas,$20
+                        movb #$FF BIN2                        
                         movb #$02 LEDS
                         movb #$0C PIEH
+
+                        ;; borrar num_array con FF - BEGIN
+                        bclr Banderas,$04
+                        clra
+                        ldab #6             ;; limpiar Num_array
+                        ldx #Num_Array
+
+MN_Check_CleanFin       cba
+                        beq MN_jsr_config
+
+                        movb #$FF a,x
+                        inca
+
+                        bra MN_Check_CleanFin
+                        ;; borrar num_array con FF - END
 
 MN_jsr_config           jsr MODO_CONFIG                                                
 
@@ -195,52 +212,6 @@ MN_set_md_run           bclr Banderas,$10
                         bra MN_check_cprog                                            
 
 MN_fin                  bra *
-
-                        ;; main viejo
-
-                        movb #$FF Tecla
-                        clr Cont_TCL
-                        movb #$FF Tecla_in
-                        clr Banderas
-                        movb #10 Cont_Reb
-
-                        ;; llamar LCD
-                        ldx #config_l1
-                        ldy #config_l2
-                        jsr LCD    
-
-                        ;; llamar a BIN_BCD
-                        jsr BIN_BCD
-
-                        ;; borrar num_array con FF
-                        clra
-                        ldab #6             ;; limpiar Num_array
-                        ldx #Num_Array
-
-MN_Check_CleanFin       cba
-                        beq MN_ARRAY_OK
-
-                        movb #$FF a,x
-                        inca
-
-                        bra MN_Check_CleanFin                    
-
-                        ;; logica para array_ok
-
-MN_ARRAY_OK             brset Banderas,$04,Skip_tcl_read
-
-                        ;; test ph
-                        bra fin
-                        ;; test ph
-
-Tcl_read                jsr TAREA_TECLADO
-
-                        bra MN_ARRAY_OK
-
-Skip_tcl_read           jsr BCD_BIN
-                        ;; bra MN_ARRAY_OK                        
-
-fin                     bra *
 
 ;; ==================== Subrutina MUX_TECLADO ================================ 
 
@@ -428,14 +399,48 @@ FA_Return               rts
 
 MODO_RUN                rts
 
-;; ==================== Subrutina MODO_RUN ===================================
+;; ==================== Subrutina MODO_CONFIG ================================
 
-MODO_CONFIG             ldaa Num_Array
-                        cmpa #$FF
+MODO_CONFIG             tst CPROG
+                        beq MC_set_bin1
 
+                        bra MC_check_bd2
+
+MC_set_bin1             movb CPROG BIN1
+
+MC_check_bd2            brclr Banderas,$04,MC_jsr_tarea_teclado
+
+                        jsr BCD_BIN
+
+                        ldaa CPROG
+                        cmpa #11
+                        bhi MC_check_96
+
+                        bra MC_clear_num_array
+
+MC_check_96             cmpa #97
+                        blo MC_change_bin1
+
+                        bra MC_clear_num_array
+
+MC_change_bin1          movb CPROG BIN1
+
+MC_clear_num_array      ;; borrar num_array con FF - BEGIN
+                        bclr Banderas,$04
+                        clra
+                        ldab #6             ;; limpiar Num_array
+                        ldx #Num_Array
+
+MC_Check_CleanFin       cba
                         beq MC_fin
 
-                        movb #1 CPROG
+                        movb #$FF a,x
+                        inca
+
+                        bra MC_Check_CleanFin
+                        ;; borrar num_array con FF - END                 
+
+MC_jsr_tarea_teclado    jsr TAREA_TECLADO                                                                                                         
 
 MC_fin                  rts      
 
