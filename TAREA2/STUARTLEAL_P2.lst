@@ -1,0 +1,61 @@
+
+as12, an absolute assembler for Motorola MCU's, version 1.2h
+
+                        
+                        ;   DECLARACIÓN DE VARIABLES
+                        
+1000                                    org $1000
+1000                    NEGAT_POS:      ds 1
+                        
+1050                                    org $1050
+1050 10 20 30 99 54 ff  DATOS:          db $10,$20,$30,$99,$54,$FF
+                        
+1150                                    org $1150
+1150 05 34 0f 13 08 44  MASCARAS:       db $05,$34,$0f,$13,$08,$44,$29,$FE
+     29 fe
+                        
+1300                                    org $1300
+1300                    NEGAT:          ds 1000
+                        
+                        
+                        ;   INICIO DE PROGRAMA
+2000                                    org $2000
+                        
+2000 79 10 00                           clr NEGAT_POS
+2003 ce 10 50                           ldx #DATOS
+2006 cd 11 50                           ldy #MASCARAS
+                                        
+2009 a6 00              init            ldaa 0,x
+200b 81 ff                              cmpa #$FF
+200d 27 03                              beq post_init
+                                        
+200f 08                                 inx
+2010 20 f7                              bra init
+                                        
+2012 09                 post_init       dex
+                        
+2013 8e 10 50           check_fin       cpx #DATOS
+2016 2d 1b                              blt fin
+                                        
+2018 a6 40                              ldaa 0,y
+201a 81 fe                              cmpa #$FE
+201c 27 15                              beq fin
+                                        
+201e a6 3f              perform_check   ldaa 1,x-
+2020 a8 70                              eora 1,y+
+                                        
+2022 2e ef                              bgt check_fin
+                                        
+2024 35                                 pshy
+2025 cd 13 00                           ldy #NEGAT
+2028 f6 10 00                           ldab NEGAT_POS
+202b 6a ed                              staa b,y
+202d 72 10 00                           inc NEGAT_POS
+2030 31                                 puly
+2031 20 e0                              bra check_fin
+                        
+2033 20 fe              fin             bra *
+
+Executed: Thu Sep 26 18:07:17 2019
+Total cycles: 58, Total bytes: 67
+Total errors: 0, Total warnings: 0

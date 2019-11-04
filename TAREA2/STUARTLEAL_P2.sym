@@ -1,0 +1,9 @@
+check_fin  2013
+datos      1050
+fin        2033
+init       2009
+mascaras   1150
+negat      1300
+negat_pos  1000
+perform_check 201e
+post_init  2012

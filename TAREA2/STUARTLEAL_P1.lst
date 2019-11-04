@@ -1,0 +1,79 @@
+
+as12, an absolute assembler for Motorola MCU's, version 1.2h
+
+                        
+                        ;   DECLARACIÓN DE VARIABLES
+                        
+1000                                org $1000
+1000 07                 CANT:       db 7
+1001                    TEMP:       ds 1
+1002                    CAMBIO:     ds 1
+1003                    CUENTA:     ds 1
+                        
+1100                                org $1100
+1100 fe 59 70 94 ff 59  ORDENAR:    db $FE, $59, $70, $94, $FF, $59, $70
+     70
+1200                                org $1200
+1200                    ORDENADOS:  ds 7
+                        
+                        
+                        ;   INICIO DE PROGRAMA
+1500                                    org $1500
+1500 79 10 03           init            clr CUENTA
+1503 79 10 02                           clr CAMBIO
+1506 ce 11 00                           ldx #ORDENAR
+1509 cd 11 01                           ldy #ORDENAR+1
+                        
+150c b6 10 00           check_cuenta    ldaa CANT
+150f 43                                 deca
+1510 b1 10 03                           cmpa CUENTA
+1513 27 20                              beq check_cambio
+                                        
+1515 a6 00                              ldaa 0,x
+1517 a1 40                              cmpa 0,y
+1519 2f 13                              ble inc_indexes
+                                        
+151b 18 0d 00 10 01     exchange        movb 0,x TEMP
+1520 18 0a 40 30                        movb 0,y 1,x+
+1524 18 09 70 10 01                     movb TEMP 1,y+
+1529 72 10 02                           inc CAMBIO
+152c 20 02                              bra count_plus
+                                        
+152e 08                 inc_indexes     inx
+152f 02                                 iny
+                        
+1530 72 10 03           count_plus      inc CUENTA
+1533 20 d7                              bra check_cuenta
+                        
+1535 b6 10 02           check_cambio    ldaa CAMBIO
+1538 27 02                              beq swap
+153a 20 c4                              bra init
+                        
+153c ce 11 00           swap            ldx #ORDENAR
+153f cd 12 00                           ldy #ORDENADOS
+1542 79 10 01                           clr TEMP
+1545 79 10 03                           clr CUENTA
+                                        
+1548 b6 10 00           chk_swap_fin    ldaa CANT
+154b 43                                 deca
+154c b1 10 03                           cmpa CUENTA
+154f 27 13                              beq fin
+                                        
+1551 a6 00                              ldaa 0,x
+1553 b1 10 01                           cmpa TEMP
+                                        
+1556 27 03                              beq inc_swp_cuen
+                                        
+1558 6a 40                              staa 0,y
+155a 02                                 iny
+                                        
+155b 08                 inc_swp_cuen    inx
+155c 7a 10 01                           staa TEMP
+155f 72 10 03                           inc CUENTA
+1562 20 e4                              bra chk_swap_fin
+                        
+1564 20 fe              fin             bra *
+
+Executed: Fri Sep 27 08:26:41 2019
+Total cycles: 109, Total bytes: 110
+Total errors: 0, Total warnings: 0

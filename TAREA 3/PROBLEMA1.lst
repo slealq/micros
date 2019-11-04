@@ -1,0 +1,301 @@
+
+as12, an absolute assembler for Motorola MCU's, version 1.2h
+
+                        ;; ===========================================================================
+                        ;; ==================== DECLARACION DE ESTRUCTURAS DE DATOS ==================
+                        ;; ===========================================================================
+                        
+1000                                            org $1000
+1000 10                 LONG:                   db 16
+1001                    CANT:                   ds 1
+1002                    CONT:                   ds 1
+1003 10                 CUAD_LONG:              db 16
+                        
+1020                                            org $1020
+1020 04 09 12 04 31 3f  DATOS:                  db 4,9,18,4,49,63,144,225,36,15,100,196,5,6,81,64
+     90 e1 24 0f 64 c4
+     05 06 51 40
+                        
+1040                                            org $1040
+1040 00 01 04 09 10 19  CUAD:                   db 0,1,4,9,16,25,36,49,64,81,100,121,144,169,196,225
+     24 31 40 51 64 79
+     90 a9 c4 e1
+                        
+1100                                            org $1100
+1100                    ENTERO:                 ds LONG         ;; pueden ser HASTA LONG valores
+                        
+                        ;; ==================== DECLARACION PARA LEER_CANT ===========================
+                        
+1200                                            org $1200
+                        
+1200                    DIG_COUNTER:            ds 1            ;; entero variable sin signo
+1201                    BCD_H:                  ds 1            ;; entero variable sin signo
+1202                    BCD_L:                  ds 1            ;; entero variable sin signo
+                        
+0000                    FIN_CHAR:               equ $0
+000d                    CR:                     equ $0D
+000a                    LF:                     equ $0A
+                        
+1203 3e 20 49 4e 47 52  IN_MSG:                 fcc '> INGRESE EL VALOR DE CANT (ENTRE 1 Y 99): '
+     45 53 45 20 45 4c
+     20 56 41 4c 4f 52
+     20 44 45 20 43 41
+     4e 54 20 28 45 4e
+     54 52 45 20 31 20
+     59 20 39 39 29 3a
+     20
+122e 00                                         db FIN_CHAR
+                        
+                        ;; ==================== DECLARACION PARA RAIZ ================================                        
+                        
+122f                    RAIZ_IN                 ds 1                        
+                        
+                        ;; ==================== DECLARACION PARA BUSCAR ==============================
+                        
+1230                    IDX_DATOS               ds 1
+1231                    IDX_CUAD                ds 1   
+                        
+                        ;; ==================== DECLARACION PARA PRINT_RESULT ========================
+                        
+1232 3e 20 43 41 4e 54  CONT_MSG:               fcc '> CANTIDAD DE VALORES ENCONTRADOS: %u'
+     49 44 41 44 20 44
+     45 20 56 41 4c 4f
+     52 45 53 20 45 4e
+     43 4f 4e 54 52 41
+     44 4f 53 3a 20 25
+     75
+1257 00                                         db FIN_CHAR
+                        
+1258 3e 20 45 4e 54 45  ENTEROS_MSG:            fcc '> ENTERO: '
+     52 4f 3a 20
+1262 00                                         db FIN_CHAR
+                        
+1263 2c                 COMMA:                  db ','
+                        
+1264 25 75              UINT:                   fcc '%u'
+1266 00                                         db FIN_CHAR
+                        
+1267 0d 0a 0d 0a 00     ESPACIO:                db CR,LF,CR,LF,FIN_CHAR
+                        
+126c                    CONTADOR:               ds 1
+                        
+                        ;; ==================== DECLARACION PARA DEBUG12 =============================
+                        
+ee84                    GETCHAR:                equ $EE84
+ee86                    PUTCHAR:                equ $EE86
+ee88                    PRINTF:                 equ $EE88
+                        
+                        ;; ===========================================================================
+                        ;; ==================== INICIO DE CODIFICACION ===============================
+                        ;; ===========================================================================
+                        
+2000                                            org $2000
+2000 cf 3b ff                                   lds #$3bff
+                                                
+2003 16 20 0e                                   jsr leer_cant           ;; ir a pedir dato
+                        
+2006 16 20 89                                   jsr buscar
+                        
+2009 16 20 d4                                   jsr print_result
+                        
+200c 20 fe              fin                     bra *
+                        
+                        ;; ==================== SUBRUTINA LEER_CANT ===================================
+                        
+200e ce 00 00           leer_cant               ldx #$0000
+2011 cc 12 03                                   ldd #IN_MSG
+                        
+2014 15 e3 ee 88                                jsr [PRINTF,x]
+                                                
+2018 79 12 00                                   clr DIG_COUNTER
+                                                
+201b ce 00 00           get_input_char          ldx #$0000
+                        
+201e 15 e3 ee 84                                jsr [GETCHAR,x]
+                        
+2022 c1 30                                      cmpb #$30
+2024 25 f5                                      blo get_input_char
+                                                
+2026 c1 39                                      cmpb #$39
+2028 22 f1                                      bhi get_input_char
+                                                
+202a f7 12 00                                   tst DIG_COUNTER        ;; dig_counter != 0
+202d 26 05                                      bne verif_dig_counter_1
+                        
+202f 7b 12 01                                   stab BCD_H              ;; bcd_h <- R2
+2032 20 0e                                      bra inc_dig_counter
+                        
+2034 b6 12 01           verif_dig_counter_1     ldaa BCD_H              ;; bcd_h != $30/>
+2037 81 30                                      cmpa #$30
+2039 26 04                                      bne guardar_bcd_l
+                        
+203b c1 30                                      cmpb #$30               ;; R2 == 0
+203d 27 dc                                      beq get_input_char
+                                                
+203f 7b 12 02           guardar_bcd_l           stab BCD_L              ;; bcd_l <- R2
+                                                
+2042 72 12 00           inc_dig_counter         inc dig_counter
+2045 15 e3 ee 86                                jsr [PUTCHAR,x]
+                        
+2049 b6 12 00                                   ldaa dig_counter        ;; dig_counter = 2 ?
+204c 81 02                                      cmpa #$02
+204e 26 cb                                      bne get_input_char
+                        
+2050 b6 12 01           leer_cant_retorno       ldaa BCD_H              ;; CANT =
+2053 80 30                                      suba #$30               ;; (BCD_H-$30)*10+ BCD_L - $30
+2055 c6 0a                                      ldab #$0a
+2057 12                                         mul
+2058 b6 12 02                                   ldaa BCD_L
+205b 80 30                                      suba #$30
+205d 18 06                                      aba
+205f 7a 10 01                                   staa CANT
+                                                
+2062 3d                                         rts
+                        
+                        ;; ==================== SUBRUTINA RAIZ ========================================
+                                                
+2063 1b 82              raiz                    leas 2,SP
+                                                
+2065 32                                         pula
+                        
+2066 7a 12 2f                                   staa RAIZ_IN    
+2069 c7                                         clrb
+                        
+206a 18 17              while_diff              cba
+206c 27 17                                      beq raiz_regresar
+                                                
+206e b7 06                                      tfr a,y
+2070 87                                         clra
+2071 f6 12 2f                                   ldab RAIZ_IN
+2074 b7 65                                      tfr y,x
+2076 18 10                                      idiv
+2078 b7 61                                      tfr y,b
+207a 1a e5                                      abx
+207c b7 54                                      tfr x,d
+207e 49                                         lsrd    
+207f b7 40                                      tfr d,a
+2081 b7 61                                      tfr y,b
+                        
+2083 20 e5                                      bra while_diff
+                                                
+2085 36                 raiz_regresar           psha
+                        
+2086 1b 9e                                      leas 0-2,SP
+                        
+2088 3d                                         rts                        
+                        
+                        ;; ==================== SUBRUTINA BUSCAR ======================================
+                        
+2089 79 12 30           buscar                  clr IDX_DATOS
+208c 79 12 31                                   clr IDX_CUAD
+208f 79 10 02                                   clr CONT
+                        
+2092 b6 12 30           verif_idx_datos         ldaa IDX_DATOS
+2095 b1 10 00                                   cmpa LONG
+2098 27 39                                      beq fin_buscar
+                        
+209a ce 10 20                                   ldx #DATOS
+209d a6 e4                                      ldaa a,x                ;; a = (IDX_DATOS + DATOS)
+                        
+209f f6 12 31           verif_idx_cuad          ldab IDX_CUAD
+20a2 f1 10 03                                   cmpb CUAD_LONG
+20a5 27 24                                      beq inc_idx_datos
+                        
+20a7 ce 10 40                                   ldx #CUAD
+20aa e6 e5                                      ldab b,x                ;; b = (IDX_CUAD + CUAD)                        
+                        
+20ac 18 17                                      cba
+20ae 27 05                                      beq calc_raiz
+                        
+20b0 72 12 31                                   inc IDX_CUAD
+20b3 20 ea                                      bra verif_idx_cuad
+                        
+20b5 36                 calc_raiz               psha
+                                                
+20b6 16 20 63                                   jsr raiz
+                                                                        
+20b9 32                                         pula
+20ba ce 11 00                                   ldx #ENTERO
+20bd f6 10 02                                   ldab CONT
+20c0 6a e5                                      staa b,x                ;; *
+20c2 52                                         incb
+20c3 7b 10 02                                   stab CONT
+                        
+20c6 f1 10 01                                   cmpb CANT
+20c9 27 08                                      beq fin_buscar
+                        
+20cb 72 12 30           inc_idx_datos           inc IDX_DATOS
+20ce 79 12 31                                   clr IDX_CUAD
+                        
+20d1 20 bf                                      bra verif_idx_datos                    
+                        
+20d3 3d                 fin_buscar              rts                        
+                        
+                        ;; ==================== SUBRUTINA PRINT_RESULT ================================
+                        
+20d4 ce 00 00           print_result            ldx #$0000
+20d7 cc 12 67                                   ldd #ESPACIO
+20da 15 e3 ee 88                                jsr [PRINTF,x]
+                        
+20de f6 10 02                                   ldab CONT
+20e1 87                                         clra
+20e2 3b                                         pshd
+20e3 ce 00 00                                   ldx #$0000
+20e6 cc 12 32                                   ldd #CONT_MSG                        
+20e9 15 e3 ee 88                                jsr [PRINTF,x]
+                        
+20ed ce 00 00                                   ldx #$0000
+20f0 cc 12 67                                   ldd #ESPACIO
+20f3 15 e3 ee 88                                jsr [PRINTF,x]
+                        
+20f7 ce 00 00                                   ldx #$0000
+20fa cc 12 58                                   ldd #ENTEROS_MSG
+20fd 15 e3 ee 88                                jsr [PRINTF,x]
+                        
+2101 79 12 6c                                   clr CONTADOR
+                        
+2104 cd 11 00                                   ldy #ENTERO
+2107 b6 12 6c                                   ldaa CONTADOR
+210a e6 ec                                      ldab a,y
+210c 87                                         clra
+210d 3b                                         pshd
+210e cc 12 64                                   ldd #UINT
+2111 ce 00 00                                   ldx #$0000
+2114 15 e3 ee 88                                jsr [PRINTF,x]                        
+                        
+2118 72 12 6c                                   inc CONTADOR
+211b b6 12 6c                                   ldaa CONTADOR
+                                                
+211e b1 10 02                                   cmpa CONT
+2121 27 29                                      beq imp_fin
+                        
+2123 f6 12 63           imprimir_cont           ldab COMMA
+2126 ce 00 00                                   ldx #$0000
+2129 15 e3 ee 86                                jsr [PUTCHAR,x] 
+                        
+212d cd 11 00                                   ldy #ENTERO
+2130 b6 12 6c                                   ldaa CONTADOR
+2133 e6 ec                                      ldab a,y
+2135 87                                         clra
+2136 3b                                         pshd
+2137 cc 12 64                                   ldd #UINT
+213a ce 00 00                                   ldx #$0000
+213d 15 e3 ee 88                                jsr [PRINTF,x]
+                        
+2141 72 12 6c                                   inc CONTADOR
+2144 b6 12 6c                                   ldaa CONTADOR
+                                                
+2147 b1 10 02                                   cmpa CONT
+214a 26 d7                                      bne imprimir_cont
+                        
+214c 42                 imp_fin                 inca
+214d 48                                         lsla
+214e 1b f4                                      leas a,sp
+                        
+2150 3d                                         rts
+                        
+                                            
+
+Executed: Mon Oct 07 23:24:47 2019
+Total cycles: 385, Total bytes: 473
+Total errors: 0, Total warnings: 0
