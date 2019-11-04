@@ -31,7 +31,7 @@ CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
 DT:                     ds 1
 BIN1:                   db 99
-BIN2:                   db 14
+BIN2:                   db $ff
 LOW:                    ds 1
 BCD1:                   ds 1
 BCD2:                   ds 1
@@ -46,15 +46,14 @@ D2ms:                   db 100
 D260us:                 db 13
 D40us:                  db 2
 Clear_LCD:              db $01
-ADD_L1:                 ds $80
-ADD_L2:                 ds $C0
+ADD_L1:                 ds 1
+ADD_L2:                 ds 1
 iniDISP:                db $04,$28,$28,$06,$0C
-
-InicioDeMensajes:
+iniMensajes:
 config_l1:              fcc 'MODO CONFIG'
                         db EOM
 
-config_l2:              fcc 'INGRESE PROG.'                        
+config_l2:              fcc 'INGRESE CPROG.'                        
                         db EOM
 
 ;; ===========================================================================
@@ -133,8 +132,6 @@ config_l2:              fcc 'INGRESE PROG.'
                         movb #10 Cont_Reb
 
                         ;; llamar LCD
-                        ldx #config_l1
-                        ldy #config_l2
                         jsr LCD    
 
                         ;; llamar a BIN_BCD
@@ -570,8 +567,7 @@ SE_cmd_l_en             bset PORTK,$02
 
 ;; ==================== Subrutina LCD ========================================
 
-LCD                     pshx
-                        ldab #1
+LCD                     ldab #1
 
 LC_tst_fin              ldaa iniDISP
                         inca
@@ -602,7 +598,8 @@ LC_clr                  ldaa Clear_LCD
 
                         jsr DELAY
 
-                        pulx
+                        ldx #config_l1
+                        ldy #config_l2
 
                         jsr Cargar_LCD
 
@@ -610,7 +607,7 @@ LC_clr                  ldaa Clear_LCD
 
 ;; ==================== Subrutina Cargar_LCD =================================
 
-CARGAR_LCD              ldaa ADD_L1
+CARGAR_LCD              ldaa #$80
                         bclr Banderas,$80
 
                         jsr SEND
@@ -634,7 +631,7 @@ CLCD_ld_l1              ldaa 1,x+
 
                         bra CLCD_ld_l1
 
-CLDC_l2                 ldaa ADD_L2
+CLDC_l2                 ldaa #$C0
                         bclr Banderas,$80
 
                         jsr SEND
