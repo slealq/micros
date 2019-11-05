@@ -22,8 +22,6 @@ Cont_reb:               ds 1
 Cont_TCL:               ds 1
 Patron:                 ds 1
 Banderas:               ds 1
-Num_Array:              ds 6
-Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 Cuenta:                 ds 1
 Acumul:                 ds 1
 CPROG:                  ds 1
@@ -43,8 +41,7 @@ DISP1:                  db 1
 DISP2:                  db 1
 DISP3:                  db 1
 DISP4:                  db 1
-SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F
-CONT_7SEG:              ds 1
+CONT_7SEG:              dw 1
 Cont_Delay:             ds 1
 D2ms:                   db 100
 D260us:                 db 13
@@ -52,7 +49,20 @@ D40us:                  db 2
 Clear_LCD:              db $01
 ADD_L1:                 db $80
 ADD_L2:                 db $C0
+
+                        org $1030
+Num_Array:              ds 6
+
+                        org $1040
+Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
+
+                        org $1050
+SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F
+
+                        org $1060
 iniDISP:                db $04,$28,$28,$06,$0C
+
+                        org $1070
 iniMensajes:
 config_l1:              fcc 'MODO CONFIG'
                         db EOM
@@ -136,7 +146,7 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         ;; inicializar estructuras de datos
                         clr CONT_DIG
                         clr CONT_TICKS
-                        movb #5000 CONT_7SEG
+                        movw #5000 CONT_7SEG
 
                         clr CPROG
                         clr Acumul
@@ -978,14 +988,16 @@ TC4_ld_4                movb #$0F PTP
 TC4_clean_val           bset PTJ,$02
                         movb #$0F PTP
 
-TC4_DEC_Cont7seg        dec CONT_7SEG
-                        tst CONT_7SEG
+TC4_DEC_Cont7seg        ldy CONT_7SEG
+                        dey
+                        sty CONT_7SEG
+                        cpy #0
                         beq TC4_7seg
 
                         bra TC4_Retornar
 
 TC4_7seg                jsr BCD_7SEG
 
-                        movb #5000 CONT_7SEG                        
+                        movw #5000 CONT_7SEG                        
 
 TC4_Retornar            rti
