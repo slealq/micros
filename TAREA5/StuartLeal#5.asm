@@ -434,7 +434,15 @@ MR_inc_cuenta           movb VMAX TIMER_CUENTA
                         bra MR_update_and_return
 
 MR_inc_acumul           inc ACUMUL
-                        bset PORTE,$04                        
+                        bset PORTE,$04     
+
+                        ldaa ACUMUL
+                        cmpa #99
+                        bhi MR_clr_acumul
+
+                        bra MR_update_and_return
+
+MR_clr_acumul           clr ACUMUL
 
 MR_update_and_return    movb CUENTA BIN1
                         movb ACUMUL BIN2
@@ -452,20 +460,27 @@ MC_set_bin1             movb CPROG BIN1
 
 MC_check_bd2            brclr Banderas,$04,MC_jsr_tarea_teclado
 
+                        ldab CPROG
+                        pshb
+
                         jsr BCD_BIN
+                        pulb
 
                         ldaa CPROG
                         cmpa #11
                         bhi MC_check_96
 
-                        bra MC_clear_num_array
+                        bra MC_restore_cprog
 
 MC_check_96             cmpa #97
                         blo MC_change_bin1
 
-                        bra MC_clear_num_array
+                        bra MC_restore_cprog
 
 MC_change_bin1          movb CPROG BIN1
+    	                bra MC_clear_num_array
+
+MC_restore_cprog        stab CPROG
 
 MC_clear_num_array      ;; borrar num_array con FF - BEGIN
                         bclr Banderas,$04
