@@ -644,7 +644,14 @@ BCD_7SEG                ldaa BCD2
                         lsra
                         lsra
                         
+                        cmpa #0
+                        beq BCD_save_ff_disp1
+
                         movb a,x DISP1
+
+                        bra BCD_7s_put_bcd2
+
+BCD_save_ff_disp1       movb #00 DISP1
 
                         bra BCD_7s_put_bcd2
 
@@ -667,7 +674,14 @@ BCD_7s_put_bcd2         ldaa BCD1
                         lsra
                         lsra
                         
+                        cmpa #0
+                        beq BCD_save_ff_disp2
+
                         movb a,x DISP3
+
+                        bra BCD_7s_return
+
+BCD_save_ff_disp2       movb #00 DISP3     
 
                         bra BCD_7s_return
 
