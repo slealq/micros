@@ -25,12 +25,20 @@ CONT_OC:                ds 1
 POS:                    ds 2
 TEMP:                   ds 2
 
-TEST_MSG:               fcc 'Este es un mensaje de prueba'
+ENCABEZADO:             fcc 'MEDICION DE VOLUMEN'
+                        db LF,CR,EOL
+
+VOLUMEN_MSG:            fcc 'VOLUMEN '
+                        db LF,CR
+                        fcc 'ACTUAL: '
+VOLUMEN_VAL:            ds 3
                         db EOL
 
-VOLUMEN_MSG:            fcc 'VOLUMEN ACTUAL: '
-VOLUMEN_VAL:            ds 3
-                        db LF,CR,EOL
+                        ;; son 22 caracteres para borrar todo el mensaje
+                         ;; de volumen_msg
+VOLUMEN_MSG_DEL:        db 8,8,8,8,8,8,8,8,8,8,8
+                        db 8,8,8,8,8,8,8,8,8,8,8
+                        db CR,EOL
 
 ;; ===========================================================================
 ;; ==================== DECLARACION DE INTERRUPCIONES ========================
@@ -162,6 +170,8 @@ OC5_ISR                 ldd TCNT
                         addd #37500
                         std TC5
 
+                        cli
+
                         tst CONT_OC
                         beq OC5_ld_msg_vars
 
@@ -170,43 +180,65 @@ OC5_ISR                 ldd TCNT
 
 OC5_ld_msg_vars         jsr SET_VOL
 
-                        movw #VOLUMEN_MSG POS
+                        movw #VOLUMEN_MSG_DEL POS
+                        bset SC1CR2,$40
+
+OC5_wait_send           brclr SC1CR2,$40,OC5_send_erase
+                        bra OC5_wait_send
+OC5_send_erase          movw #VOLUMEN_MSG POS
                         bset SC1CR2,$40
 
                         movb #10 CONT_OC
 
 OC5_return              rti                        
 
+;; ==================== Subrutina MSG_CONTROL =================================
+
+
+
 ;; ==================== Subrutina SET_VOL =====================================
 
-SET_VOL                 ldd VOLUMEN
+SET_VOL                 ldd VOLUMEN ;; calcular centenas
                         ldx #100
                         idiv 
                         tfr x,d
 
-                        stab VOLUMEN_VAL
-                        bset VOLUMEN_VAL,$30
+                        stab VOLUMEN_VAL ;; guardar en primer valor
+                        bset VOLUMEN_VAL,$30 ;; y sumar $30
 
-                        ldy #100
+                        ldy #100 ;; restar centenas*100
                         emul
                         std TEMP
                         ldd VOLUMEN
                         subd TEMP
                         tfr d,y
-                        ldx #10
+                        ldx #10 ;; calcular decenas
                         idiv
                         tfr x,b
                         
-                        stab VOLUMEN_VAL+1
-                        bset VOLUMEN_VAL+1,$30
+                        stab VOLUMEN_VAL+1 ;; guardar en segundo valor
+                        bset VOLUMEN_VAL+1,$30 ;; sumar $30
 
-                        ldaa #10
+                        ldaa #10 ;; restar decenas*10 a Volumen sin centenas
                         mul
                         std TEMP
                         tfr y,d
                         subd TEMP
 
-                        stab VOLUMEN_VAL+2
-                        bset VOLUMEN_VAL+2,$30
+                        stab VOLUMEN_VAL+2 ;; guardar unidades
+                        bset VOLUMEN_VAL+2,$30 ;; sumar $30
 
                         rts
+
+;; ==================== Subrutina SMB ========================================
+                        
+                        ;; Subrutina SendMessageBlocking
+                        ;; Envía un string por puerto serial
+                        ;; y se espera hasta que se envíe completo
+
+SMD                     bset SC1CR2,$40
+
+SMD_wait_send           brclr SC1CR2,$40,SMD_return
+                        bra SMD_wait_send
+
+SMD_return              rts                        
