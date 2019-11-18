@@ -101,6 +101,8 @@ MN_After_10us           movb #$30 ATD0CTL3
                         movb #$00 TCTL2
                         movb #$20 TIE
  
+                        ;; habilitar rele
+                        bset DDRE,$04
 
                         cli                        
 
@@ -361,6 +363,7 @@ MC_aler_alt_chk         ldab SECUENCIA
                         bne MC_aler_alta
 
                         ;; encender bomba !
+                        bset PORTE,$04
                         bra MC_retornar
 
 MC_aler_alta            movw #ALERTA_ALTA POS
@@ -370,6 +373,7 @@ MC_aler_alta            movw #ALERTA_ALTA POS
                         bne MC_retornar
 
                         ;; apagar bomba !
+                        bclr PORTE,$04
 
 MC_retornar             rts
 
