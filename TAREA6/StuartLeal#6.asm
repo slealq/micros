@@ -1,6 +1,6 @@
 ;; ===========================================================================
 ;; Autor: Stuart Leal Q
-;; Fecha: 12 de Noviembre de 2019
+;; Fecha: 17 de Noviembre de 2019
 ;; Version: 1.0
 ;; ===========================================================================
 
@@ -204,7 +204,7 @@ OC5_ISR                 ldd TCNT
 
 OC5_ld_msg_vars         jsr MSG_CONTROL
 
-                        movb #10 CONT_OC
+                        movb #10 CONT_OC  
 
 OC5_return              rti                        
 
@@ -225,18 +225,25 @@ MSG_CONTROL             cli ;; hay que habilitar interrupciones para SCI
                         cpd #442
                         blo MC_chk_st_2
 
-                        tst SECUENCIA
-                        beq MC_st_2_in_sec
+                        ldab SECUENCIA
+                        cmpb #2
+                        beq MC_st2_clr_sec
+                        
+                        cmpb #0
+                        beq MC_st2_inc_sec
                         bra MC_perform_action
 
-MC_st_2_in_sec          inc SECUENCIA
+MC_st2_clr_sec          clr SECUENCIA
+                        bra MC_perform_action
+
+MC_st2_inc_sec          inc SECUENCIA
                         bra MC_perform_action
 
 MC_chk_st_2             ldab SECUENCIA
                         cmpb #2
                         beq MC_st2_ch_st
 
-                        inc SECUENCIA
+                        movb #2 SECUENCIA
                         bra MC_perform_action
 
 MC_st2_ch_st            movb #1 ESTADO
@@ -244,23 +251,30 @@ MC_st2_ch_st            movb #1 ESTADO
                         bra MC_perform_action      
                         ;; bloque de comparación para ESTADO = 2 | FIN
 
-                        
+                        ;; bloque de comparación para ESTADO = 0 | INICIO
 MC_st_0                 ldd VOLUMEN
                         cpd #147
                         bhi MC_chk_st_0      
 
-                        tst SECUENCIA
-                        beq MC_st_0_in_sec
+                        ldab SECUENCIA
+                        cmpb #2
+                        beq MC_st0_clr_sec
+                        
+                        cmpb #0
+                        beq MC_st0_inc_sec
                         bra MC_perform_action
 
-MC_st_0_in_sec          inc SECUENCIA
+MC_st0_clr_sec          clr SECUENCIA
+                        bra MC_perform_action
+
+MC_st0_inc_sec          inc SECUENCIA
                         bra MC_perform_action
 
 MC_chk_st_0             ldab SECUENCIA
                         cmpb #2
                         beq MC_st0_ch_st
 
-                        inc SECUENCIA
+                        movb #2 SECUENCIA
                         bra MC_perform_action
 
 MC_st0_ch_st            movb #1 ESTADO
