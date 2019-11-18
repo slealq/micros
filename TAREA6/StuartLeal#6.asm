@@ -154,11 +154,16 @@ CALCULO                 ldd NIVEL_PROM
                         ediv
 
                         cpd #500
-                        blo CALCULO_sv_nivel
+                        blo CALCULO_nivel_clamp
 
                         iny
 
-CALCULO_sv_nivel        tfr y,a
+CALCULO_nivel_clamp     cpy #25
+                        bls CALCULO_store_nivel
+
+                        ldy #25
+
+CALCULO_store_nivel     tfr y,a
                         staa NIVEL
                         ldd #AREA100
                         emul
