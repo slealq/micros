@@ -15,6 +15,8 @@ AREA100:                EQU 1963
 EOL:                    EQU 4
 LF:                     EQU 10
 CR:                     EQU 13
+BS:                     EQU 8
+SPC:                    EQU 32
 
                         org $1010
 NIVEL_PROM:             ds 2
@@ -24,21 +26,33 @@ CONT_OC:                ds 1
 
 POS:                    ds 2
 TEMP:                   ds 2
+ESTADO:                 ds 1
+SECUENCIA:              ds 1
 
 ENCABEZADO:             fcc 'MEDICION DE VOLUMEN'
                         db LF,CR,EOL
 
-VOLUMEN_MSG:            fcc 'VOLUMEN '
-                        db LF,CR
-                        fcc 'ACTUAL: '
+VOLUMEN_MSG:            fcc 'VOLUMEN ACTUAL: '
 VOLUMEN_VAL:            ds 3
-                        db EOL
+                        db LF,CR,EOL
+                        ;; son 19 caracteres para borrar todo el mensaje
+                        ;; de volumen_msg
+VOLUMEN_MSG_DEL:        db BS,CR,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC
+                        db SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,CR,EOL
 
-                        ;; son 22 caracteres para borrar todo el mensaje
-                         ;; de volumen_msg
-VOLUMEN_MSG_DEL:        db 8,8,8,8,8,8,8,8,8,8,8
-                        db 8,8,8,8,8,8,8,8,8,8,8
-                        db CR,EOL
+ALERTA_BAJO:            fcc 'Alarma: El Nivel esta Bajo'
+                        db LF,CR,EOL
+                        ;; son 26 caracteres para borrar el msg de alarma bajo
+ALERTA_BAJO_DEL:        db BS,CR,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC
+                        db SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC
+                        db SPC,SPC,SPC,CR,EOL
+
+ALERTA_ALTA:            fcc 'Tanque lleno, Bomba Apagada'
+                        db LF,CR,EOL
+                        ;; son 27 caracteres para borrar el msg de alarma bajo
+ALERTA_ALTA_DEL:        db BS,CR,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC
+                        db SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC,SPC
+                        db SPC,SPC,SPC,SPC,CR,EOL                        
 
 ;; ===========================================================================
 ;; ==================== DECLARACION DE INTERRUPCIONES ========================
@@ -98,6 +112,18 @@ MN_After_10us           movb #$30 ATD0CTL3
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
+
+                        movb #1 ESTADO
+                        clr SECUENCIA
+ 
+                        ;; escribir encabezado y msg primera vez
+                        movw #ENCABEZADO POS
+                        jsr SMB
+
+                        jsr SET_VOL
+                        movw #VOLUMEN_MSG POS
+                        jsr SMB                        
+                        ;; seguir haciendo los calculos de vol y metros
 
 MN_fin                  jsr CALCULO
                         bra MN_fin                        
@@ -170,23 +196,13 @@ OC5_ISR                 ldd TCNT
                         addd #37500
                         std TC5
 
-                        cli
-
                         tst CONT_OC
                         beq OC5_ld_msg_vars
 
                         dec CONT_OC
                         bra OC5_return 
 
-OC5_ld_msg_vars         jsr SET_VOL
-
-                        movw #VOLUMEN_MSG_DEL POS
-                        bset SC1CR2,$40
-
-OC5_wait_send           brclr SC1CR2,$40,OC5_send_erase
-                        bra OC5_wait_send
-OC5_send_erase          movw #VOLUMEN_MSG POS
-                        bset SC1CR2,$40
+OC5_ld_msg_vars         jsr MSG_CONTROL
 
                         movb #10 CONT_OC
 
@@ -194,7 +210,154 @@ OC5_return              rti
 
 ;; ==================== Subrutina MSG_CONTROL =================================
 
+MSG_CONTROL             cli ;; hay que habilitar interrupciones para SCI
 
+                        ldaa ESTADO
+
+                        cmpa #0
+                        beq MC_st_0
+
+                        cmpa #1
+                        beq MC_st_1
+
+                        ;; bloque de comparación para ESTADO = 2 | INICIO
+                        ldd VOLUMEN
+                        cpd #442
+                        blo MC_chk_st_2
+
+                        tst SECUENCIA
+                        beq MC_st_2_in_sec
+                        bra MC_perform_action
+
+MC_st_2_in_sec          inc SECUENCIA
+                        bra MC_perform_action
+
+MC_chk_st_2             ldab SECUENCIA
+                        cmpb #2
+                        beq MC_st2_ch_st
+
+                        inc SECUENCIA
+                        bra MC_perform_action
+
+MC_st2_ch_st            movb #1 ESTADO
+                        clr SECUENCIA
+                        bra MC_perform_action      
+                        ;; bloque de comparación para ESTADO = 2 | FIN
+
+                        
+MC_st_0                 ldd VOLUMEN
+                        cpd #147
+                        bhi MC_chk_st_0      
+
+                        tst SECUENCIA
+                        beq MC_st_0_in_sec
+                        bra MC_perform_action
+
+MC_st_0_in_sec          inc SECUENCIA
+                        bra MC_perform_action
+
+MC_chk_st_0             ldab SECUENCIA
+                        cmpb #2
+                        beq MC_st0_ch_st
+
+                        inc SECUENCIA
+                        bra MC_perform_action
+
+MC_st0_ch_st            movb #1 ESTADO
+                        clr SECUENCIA
+                        bra MC_perform_action    
+                        ;; bloque de comparación para ESTADO = 0 | FIN
+
+                        ;; bloque de comparación para ESTADO = 1 | INICIO
+
+MC_st_1                 ldd VOLUMEN
+                        cpd #74
+                        bls MC_st1_2_st0
+
+                        cpd #442
+                        bhs MC_st1_2_st2
+
+                        bra MC_perform_action
+
+MC_st1_2_st0            clr ESTADO
+                        clr SECUENCIA
+                        bra MC_perform_action
+
+MC_st1_2_st2            movb #2 ESTADO
+                        clr SECUENCIA
+                        ;; bloque de comparación para ESTADO = 1 | FIN
+
+
+                        ;; comienza P1A -> Acciones de borrar e imprimir
+MC_perform_action       ldaa ESTADO
+                        cmpa #0
+                        beq MC_aler_baja_chk_del
+
+                        cmpa #2
+                        beq MC_aler_alt_chk_del
+
+                        bra MC_rm_msg
+
+MC_aler_baja_chk_del    tst SECUENCIA
+                        bne MC_aler_baja_del
+                        bra MC_rm_msg
+
+MC_aler_baja_del        movw #ALERTA_BAJO_DEL POS
+                        jsr SMB
+                        bra MC_rm_msg
+
+MC_aler_alt_chk_del     tst SECUENCIA
+                        bne MC_aler_alta_del
+                        bra MC_rm_msg
+
+MC_aler_alta_del        movw #ALERTA_ALTA_DEL POS
+                        jsr SMB
+
+                        ;; lo siguiente siempre debería ejecutarse,
+                        ;; sin importar cuál es el estado
+MC_rm_msg               movw #VOLUMEN_MSG_DEL POS
+                        jsr SMB
+
+                        jsr SET_VOL
+                        movw #VOLUMEN_MSG POS
+                        jsr SMB
+
+                        ;; ahora hay que ver si hay que imprimir alguna
+                        ;; alerta
+                        ldaa ESTADO
+                        cmpa #0
+                        beq MC_aler_baja_chk
+
+                        cmpa #2
+                        beq MC_aler_alt_chk
+
+                        bra MC_retornar
+
+MC_aler_baja_chk        ldab SECUENCIA
+                        cmpb #2
+                        bne MC_aler_baja
+                        bra MC_retornar
+
+MC_aler_baja            movw #ALERTA_BAJO POS
+                        jsr SMB
+                        bra MC_retornar
+
+MC_aler_alt_chk         ldab SECUENCIA
+                        cmpb #2
+                        bne MC_aler_alta
+
+                        ;; encender bomba !
+                        bra MC_retornar
+
+MC_aler_alta            movw #ALERTA_ALTA POS
+                        jsr SMB
+
+                        tst SECUENCIA
+                        bne MC_retornar
+
+                        ;; apagar bomba !
+
+MC_retornar             rts
 
 ;; ==================== Subrutina SET_VOL =====================================
 
@@ -236,9 +399,9 @@ SET_VOL                 ldd VOLUMEN ;; calcular centenas
                         ;; Envía un string por puerto serial
                         ;; y se espera hasta que se envíe completo
 
-SMD                     bset SC1CR2,$40
+SMB                     bset SC1CR2,$40
 
-SMD_wait_send           brclr SC1CR2,$40,SMD_return
-                        bra SMD_wait_send
+SMB_wait_send           brclr SC1CR2,$40,SMB_return
+                        bra SMB_wait_send
 
-SMD_return              rts                        
+SMB_return              rts                        
