@@ -913,19 +913,24 @@ CLCD_ld_l2              ldaa 1,y+
 
 CLCD_return             rts                                                                        
 
-;; ==================== Subrutina RTI_ISR ==================================== 
+;; ==================== Subrutina RTI_ISR ====================================
+;; Descripción: Subrutina para decrementar contadores usados para suprimir
+;;              rebotes.
+;;
+;;  - Si se quiere suprimir rebotes, se carga un valor en Cont_reb y esta
+;;  subrutina se encarga de decrementar el contador cada 1ms.
+;; 
+;;  PARAMETROS DE ENTRADA: 
+;;      - Cont_reb: Variable tipo byte en donde se guarda el multiplo de 1ms
+;;                  a decrementas                    
+;;  PARAMETROS DE SALIDA: ninguno
 
 RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 
                         tst Cont_reb
-                        beq RTI_check_tmr_cnt
+                        beq RTI_retornar
 
                         dec Cont_reb
-
-RTI_check_tmr_cnt       tst TIMER_CUENTA
-                        beq RTI_retornar
-                        
-                        dec TIMER_CUENTA
 
 RTI_retornar            rti       
 
