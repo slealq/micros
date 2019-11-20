@@ -1,3 +1,4 @@
 *.lst
 *.s19
 *.sym
+out/

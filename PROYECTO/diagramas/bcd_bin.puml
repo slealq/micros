@@ -1,0 +1,20 @@
+@startuml BIN_BCD
+skinparam DefaultTextAlignment center
+
+:BIN_BCD;
+
+:J 🡰 NUM_ARRAY
+R1 🡰 0
+CPROG 🡰 0]
+
+label test
+:R2 🡰 ((J))
+J 🡰 (J) + 1]
+
+if ((R2) = $FF) then (si)
+    goto continue
+
+label continue
+
+:RETORNAR;
+@enduml

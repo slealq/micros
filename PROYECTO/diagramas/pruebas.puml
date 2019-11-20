@@ -1,0 +1,44 @@
+skinparam style strictuml
+
+'  By changing the final ; separator, you can set different rendering for the activity:
+
+'     |
+'     <
+'     >
+'     /
+'     ]
+'     }
+
+' ALT 24 ↑
+' ALT 25 ↓
+' ALT 26 →
+' ALT 27 ←
+' ALT 24 ▲
+' ALT 24 ↑
+' ALT 24 ↑
+
+
+@startuml BIN_BCD
+:BIN_BCD;
+:R1 ➞ (BIN1)]
+:R1 ⬅️ (BIN1);]
+:R1 ➜ (BIN1);]
+:R1 ➔ (BIN1);]
+:R1 ➞ (BIN1);]
+:R1 ⇐ (BIN1);]
+:R1 ← (BIN1);]
+:R1 🡄 (BIN1);]
+:R1 🢀 (BIN1);]
+:R1 🡸 (BIN1);]
+:R1 🡰 (BIN1);]
+
+:R1 🡹 (BIN1);]
+
+:R1 🡱 (BIN1);]
+:R1 🡱🡰 (BIN1);]
+🡳
+
+
+
+:RETORNAR;
+@enduml
