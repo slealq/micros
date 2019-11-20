@@ -367,7 +367,20 @@ MX_ret_ff               movb #$FF Tecla
 
 MX_return               rts                                                
 
-;; ==================== Subrutina TAREA_TECLADO ============================== 
+;; ==================== Subrutina TAREA_TECLADO ==============================
+;; Descripción: Subrutina para supresión de rebotes y tecla retenida.
+;; 
+;;  - Hace uso de la subrutina MUX_TECLADO, quién lee una tecla, y de la 
+;;    subrutina FORMAR_ARRAY, que guarda teclas en un arreglo.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: ninguno
+;;  ESTADOS INTERNOS:
+;;      - BANDERAS: En banderas se escriben dos banderas, en bit 0 se escribe
+;;                  TCL_LISTA, y en bit 1 se escribe TCL_LEIDA.
+;;      - TECLA_IN: Se usa para guardar la tecla presionada inicialmente,
+;;                  para comparar luego de un tiempo determinado (10-20ms) 
+;;                  y saber si es la misma o no.
 
 TAREA_TECLADO           tst Cont_reb
                         bne TT_Return
@@ -378,8 +391,10 @@ TAREA_TECLADO           tst Cont_reb
                         cmpa #$FF 
                         beq TT_Check_antirebote
 
+                        ;; banderas.1 = 1 ?
                         brset Banderas,$02,TT_Check_tecla_igual
 
+                        ;; banderas.1 = 0 => TCL NO LEIDA
                         movb Tecla Tecla_in
                         bset Banderas,$02 ;; TCL_LEIDA <- 1
                         movb #10 Cont_reb
@@ -396,6 +411,7 @@ TT_go_formar_array      bclr Banderas,$02
 
                         bra TT_Return                     
 
+                        ;; banderas.1 = 1 => TCL LEIDA
 TT_Check_tecla_igual    ldaa Tecla_in
                         cmpa Tecla
                         beq TT_Set_tecla_lista
