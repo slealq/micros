@@ -90,8 +90,18 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         dw TC4_ISR                        
 
 ;; ===========================================================================
-;; ==================== CODIFICACION HARDWARE ================================
+;; ==================== RUTINA DE INICIACIÓN =================================
 ;; ===========================================================================
+
+                        ;; CONFIGURACION DE ATD0
+                        ldab 200
+                        movb #$82 ATD0CTL2
+
+MN_wait_10us            dbne b,MN_wait_10us
+
+MN_After_10us           movb #$30 ATD0CTL3
+                        movb #$10 ATD0CTL4
+                        movb #$87 ATD0CTL5
 
                         org $2000
                         lds #$3bff
@@ -239,6 +249,48 @@ MN_set_md_run           bclr Banderas,$10
                         bra MN_check_cprog_local                                            
 
 MN_fin                  bra *
+
+;; ===========================================================================
+;; ==================== SUBRUTINAS DE INTERRUPCIONES =========================
+;; ===========================================================================
+
+;; ==================== Subrutina ATD0_ISR ===================================
+;; Descripción: Subrutina de atención para la interrupcion del ATD0.
+;; 
+;;  - Se calcula el promedio de seis mediciones del PAD7, y se encuentra un
+;;  valor para el brillo a partir de la ecuación: BRILLO = (20 x POT) / 255
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: 
+;;      - POT: Variable tipo byte, sin signo donde se almacena el valor
+;;             del POT, como un valor de 0 a 255.
+;;
+;;      - BRILLO: Variable tipo byte, con un valor de 0 a 100. Define el
+;;                brillo de la pantalla.             
+;;
+
+ATD0_ISR                ldd ADR00H
+                        addd ADR01H
+                        addd ADR02H
+                        addd ADR03H
+                        addd ADR04H
+                        addd ADR05H
+
+                        ;; promediar POT
+                        ldx #6
+                        idiv
+                        tfr x,a
+                        staa POT
+
+                        ;; calcular BRILLO
+                        ldab #20
+                        mul
+                        ldx #255
+                        idiv
+                        tfr x,a
+                        staa BRILLO
+
+                        rti
 
 ;; ==================== Subrutina MUX_TECLADO ================================ 
 
