@@ -1,6 +1,6 @@
 ;; ===========================================================================
 ;; Autor: Stuart Leal Q
-;; Fecha: 5 de noviembre de 2019
+;; Fecha: 19 de noviembre de 2019
 ;; Version: 1.0
 ;; ===========================================================================
 
@@ -14,7 +14,12 @@
 
 EOM:                    equ $0
 N:                      equ 100                        
-
+                        ;; variables para modo config
+                        ;; variables para tarea_teclado
+                        ;; variables para atd_isr
+BRILLO:                 ds 1
+POT:                    ds 1
+                        ;; variables para PANT_CONTRL                        
 MAX_TCL:                db 2        ;; Set de valor MAX_TCL
 Tecla:                  ds 1
 Tecla_in:               ds 1
@@ -28,7 +33,6 @@ CPROG:                  ds 1
 VMAX:                   db 250
 TIMER_CUENTA:           ds 1
 LEDS:                   db 1
-BRILLO:                 db 50
 CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
 DT:                     ds 1
@@ -87,24 +91,27 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         dw PH_ISR
 
                         org $3E66
-                        dw TC4_ISR                        
+                        dw TC4_ISR
+
+                        org $3E52
+                        dw ATD0_ISR                         
 
 ;; ===========================================================================
 ;; ==================== RUTINA DE INICIACIÓN =================================
 ;; ===========================================================================
 
+                        org $2000
+                        lds #$3bff                        
+
                         ;; CONFIGURACION DE ATD0
                         ldab 200
-                        movb #$82 ATD0CTL2
+                        movb #$C2 ATD0CTL2
 
 MN_wait_10us            dbne b,MN_wait_10us
 
 MN_After_10us           movb #$30 ATD0CTL3
-                        movb #$10 ATD0CTL4
+                        movb #$BF ATD0CTL4
                         movb #$87 ATD0CTL5
-
-                        org $2000
-                        lds #$3bff
 
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
@@ -269,7 +276,8 @@ MN_fin                  bra *
 ;;                brillo de la pantalla.             
 ;;
 
-ATD0_ISR                ldd ADR00H
+ATD0_ISR                 ;; sumar todos los datos
+                        ldd ADR00H
                         addd ADR01H
                         addd ADR02H
                         addd ADR03H
