@@ -95,13 +95,16 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         dw RTI_ISR
 
                         org $3e4c
-                        dw PH_ISR
+                        dw CALCULAR
 
                         org $3E66
                         dw TC4_ISR
 
                         org $3E52
-                        dw ATD0_ISR                         
+                        dw ATD0_ISR
+
+                        org $3E5E
+                        dw TCNT_ISR
 
 ;; ===========================================================================
 ;; ==================== RUTINA DE INICIACIÓN =================================
@@ -122,11 +125,10 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
-                        movb #$05 TSCR2     ;; Habilitar PRS = 32
-                        movb #$10 TIOS      ;; Habiliar OC 4
-                        movb #$00 TCTL1     ;; Disable PT4
-                        movb #$00 TCTL2 
-                        movb #$10 TIE       ;; Empezar oc
+                        movb #$03 TSCR2     ;; Habilitar PRS = 8
+                        ;movb #$10 TIOS      ;; Habiliar OC 4
+                        ;movb #$10 TIE       ;; Empezar oc
+                        bset TSCR2,$80      ;; habilitar interrupciones por rebase
 
                         ;; para teclado matricial                        
                         movb #$F0 DDRA      ;; 4msb como entradas de PORTA
@@ -159,7 +161,7 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; habilitar puerto boton: 0,1,2,3,7 y flanco dec
                         clr DDRH
-                        movb #$0C PIEH
+                        movb #$09 PIEH      ;; habilitar interrupcion PH3 y PH0
                         movb #$F0 PPSH
                         movb #$FF PIFH
 
@@ -333,6 +335,7 @@ ATD0_ISR                 ;; sumar todos los datos
 TCNT_ISR                ;; incrementar velocidad
                         inc TICK_VEL
 
+                        ;; CORREGIR: TICK_EN y TICK_DIS son words
                         tst TICK_EN
                         beq TCNT_en_zero
 
