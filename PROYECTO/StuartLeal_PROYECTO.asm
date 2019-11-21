@@ -262,7 +262,7 @@ MN_fin                  bra *
 ;; ===========================================================================
 
 ;; ==================== Subrutina ATD0_ISR ===================================
-;; Descripción: Subrutina de atención para la interrupcion del ATD0.
+;; Descripción: Subrutina de interrupcion para ATD0.
 ;; 
 ;;  - Se calcula el promedio de seis mediciones del PAD7, y se encuentra un
 ;;  valor para el brillo a partir de la ecuación: BRILLO = (20 x POT) / 255
@@ -299,6 +299,57 @@ ATD0_ISR                 ;; sumar todos los datos
                         staa BRILLO
 
                         rti
+
+;; ==================== Subrutina TCNT_ISR ===================================
+;; Descripción: Subrutina de interrupción para el Overflow de TCNT.
+;; 
+;;  - Con esta subrutina, CALCULO realiza los cálculos de velocidad, mediante
+;;  el uso la variable TICK_VEL.
+;;  Además, se realiza el conteo de tiempo para encender el DISPLAY con el
+;;  mensaje adecuado, de acuerdo a la posición del vehículo, utilizando las
+;;  variables TICKS_EN y TICKS=DIS.
+;;
+;;  Consideraciones: Como TICK_DIS > TICK_EN, entonces se asume que SIEMPRE
+;;  que TICK_EN != 0, TICK_DIS también va a ser != 0. 
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: 
+;;      - PANT_FLAG: Bit 3 del registro de Banderas.
+;;                   Si la bandera está en uno, quiere decir que se debe
+;;                   encender el DISPLAY para indicar la velocidad al usuario.
+;;                   Si la bandera está en cero, se debe apagar el display,
+;;                   pues se calcula que el usuario ya pasó por el letrero.
+;;      - VELOC:     Indica la velocidad calculada. Esta interrupción borra
+;;                   esta variable cuando TICKS_EN = TICKS_DIS = 0
+;;                        
+
+TCNT_ISR                ;; incrementar velocidad
+                        inc TICK_VEL
+
+                        tst TICK_EN
+                        beq TCNT_en_zero
+
+                        ;; si TICK_EN != 0, de fijo TICK_DIS tampoco
+                        dec TICK_DIS
+                        dec TICK_EN
+                        bra TCNT_retornar
+
+TCNT_en_zero            tst TICK_DIS
+                        beq TCNT_check_pflg_off
+
+                        dec TICK_DIS
+
+                        ;; Sólo encender PANT_FLAG si es 0
+                        brset Banderas,$08,TCNT_retornar
+                        bset Banderas,$08
+                        bra TCNT_retornar 
+
+                        ;; Sólo apagar PANT_FLAG si es 1
+TCNT_check_pflg_off     brclr Banderas,$08,TCNT_retornar
+                        bclr Banderas,$08
+                        clr VELOC                                
+
+TCNT_retornar           rti                        
 
 ;; ==================== Subrutina MUX_TECLADO ================================ 
 
