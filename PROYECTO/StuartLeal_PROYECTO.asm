@@ -429,7 +429,22 @@ Calc_set_cntr           movb #50 Cont_reb
 
 Calc_retornar           rti
 
-;; ==================== Subrutina MUX_TECLADO ================================ 
+;; ==================== Subrutina MUX_TECLADO ================================
+;; Descripción: Subrutina utilizada para encontrar la tecla presionada
+;;              actualmente.
+;; 
+;;  - En el puerto A, se encuentra conectado la matriz de botones pulsadores.
+;;    Esta subrutina, realiza la multiplexación de los botones, cargando
+;;    cuatro patrones específicos en la parte Alta de A: 7,D,B y E.
+;;    Luego, lee la parte baja del puerto A para determinar cuál tecla está
+;;    siendo presionada.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA:
+;;      - Tecla:    En esta variable se guarda el valor de la tecla encontrada.
+;;                  La codificación correspondiente de cuál tecla corresponde
+;;                  a cuál variable se encuentra en el array Teclas.            
+;; 
 
 MUX_TECLADO             clr Patron
 
@@ -457,6 +472,10 @@ Mx_DF                   movb #$DF PORTA
 
 Mx_BF                   movb #$BF PORTA                                                                        
 
+                        ;; Los nops son para dar tiempo entre cuando se
+                        ;; escribe la parte alta, y cuando se lee la parte
+                        ;; baja. Se encontraron errores en donde la lectura
+                        ;; de la parte baja arrojaba basura.
 Mx_COMP                 nop
                         nop
                         nop 
