@@ -19,7 +19,14 @@ N:                      equ 100
                         ;; variables para atd_isr
 BRILLO:                 ds 1
 POT:                    ds 1
-                        ;; variables para PANT_CONTRL                        
+                        ;; variables para PANT_CONTRL
+TICK_EN:                ds 2
+TICK_DIS:               ds 2
+                        ;; variables para CALCULAR
+VELOC:                  ds 1
+                        ;; variables para TCNT_ISR
+TICK_VEL:               ds 1
+                        ;; variables para CONV_BIN_BCD                                                
 MAX_TCL:                db 2        ;; Set de valor MAX_TCL
 Tecla:                  ds 1
 Tecla_in:               ds 1
@@ -307,7 +314,7 @@ ATD0_ISR                 ;; sumar todos los datos
 ;;  el uso la variable TICK_VEL.
 ;;  Además, se realiza el conteo de tiempo para encender el DISPLAY con el
 ;;  mensaje adecuado, de acuerdo a la posición del vehículo, utilizando las
-;;  variables TICKS_EN y TICKS=DIS.
+;;  variables TICK_EN y TICK_DIS.
 ;;
 ;;  Consideraciones: Como TICK_DIS > TICK_EN, entonces se asume que SIEMPRE
 ;;  que TICK_EN != 0, TICK_DIS también va a ser != 0. 
@@ -320,7 +327,7 @@ ATD0_ISR                 ;; sumar todos los datos
 ;;                   Si la bandera está en cero, se debe apagar el display,
 ;;                   pues se calcula que el usuario ya pasó por el letrero.
 ;;      - VELOC:     Indica la velocidad calculada. Esta interrupción borra
-;;                   esta variable cuando TICKS_EN = TICKS_DIS = 0
+;;                   esta variable cuando TICK_EN = TICK_DIS = 0
 ;;                        
 
 TCNT_ISR                ;; incrementar velocidad
@@ -349,7 +356,78 @@ TCNT_check_pflg_off     brclr Banderas,$08,TCNT_retornar
                         bclr Banderas,$08
                         clr VELOC                                
 
-TCNT_retornar           rti                        
+TCNT_retornar           rti
+
+;; ==================== Subrutina CALCULAR ===================================
+;; Descripción: Subrutina de interrupción para puerto H.
+;; 
+;;  - En esta subrutina se realiza el cálculo de velocidad, utilizando un
+;;  contador que es incrementado periódicamente con la subrutina TCNT_ISR. 
+;; 
+;;  Formula para el cálculo:
+;;      velocidad_kmh = (16785 * 200) / (TICK_VEL * 64)
+;;
+;;      -> Primero se hace la múltiplicación del denominador, y el resultado
+;;      queda en X. Luego el numerador, y el resultado queda en Y:D. 
+;;      Y por último, se realiza la división, y el resultado queda en Y.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: 
+;;      - VELOC:     Esta interrupción calcula la velocidad en KM/H y
+;;                   guarda el resultado en VELOC.
+;; 
+
+CALCULAR                tst Cont_reb
+                        bne Calc_retornar
+
+                        brset PIFH,$08,Calc_rst_tick_vel
+                        brset PIFH,$01,Calc_veloc
+
+                        ;; si no es ni PH0 ni PH3, borrar todas
+                        ;; y retornar
+                        movb #$FF PIFH
+                        bra Calc_retornar
+
+Calc_rst_tick_vel       ;; caso de PH3
+                        clr TICK_VEL
+                        bset PIFH,$08
+
+                        bra Calc_set_cntr
+
+Calc_veloc              ;; caso de PH0
+                        ;; calcular denominador
+                        ldaa TICK_VEL
+                        ldab #64
+                        mul
+                        tfr d,x
+
+                        ;; calcular numerador
+                        ldd #200
+                        ldy #16785
+                        emul
+
+                        ;; realizar división
+                        ediv
+
+                        ;; verificar si resultado > 255
+                        cpy #255
+                        bhi Calc_set_max_veloc
+
+                        ;; caso veloc < 255, guardar como está
+                        tfr y,a
+                        staa VELOC
+                        bra Calc_reset_ph0
+
+Calc_set_max_veloc      ;; caso veloc > 255, guardar tope
+                        movb #255 VELOC                        
+
+Calc_reset_ph0          bset PIFH,$01
+
+                        ;; la idea, es que después de 50ms, ya no va a haber
+                        ;; rebotes, entonces esta interrupción no se va a dar
+Calc_set_cntr           movb #50 Cont_reb                                                 
+
+Calc_retornar           rti
 
 ;; ==================== Subrutina MUX_TECLADO ================================ 
 
