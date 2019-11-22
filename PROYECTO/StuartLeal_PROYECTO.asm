@@ -94,7 +94,7 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         org $3E70
                         dw RTI_ISR
 
-                        org $3e4c
+                        org $3E4C
                         dw CALCULAR
 
                         org $3E66
@@ -332,22 +332,34 @@ ATD0_ISR                 ;; sumar todos los datos
 ;;                   esta variable cuando TICK_EN = TICK_DIS = 0
 ;;                        
 
-TCNT_ISR                ;; incrementar velocidad
+TCNT_ISR                ;; incrementar velocidad, mientras sea menor a 255
+                        ldaa TICK_VEL
+                        cmpa #255
+                        beq TCNT_check_en
+
                         inc TICK_VEL
 
                         ;; CORREGIR: TICK_EN y TICK_DIS son words
-                        tst TICK_EN
+TCNT_check_en           ldx TICK_EN
+                        cpx #0
                         beq TCNT_en_zero
 
                         ;; si TICK_EN != 0, de fijo TICK_DIS tampoco
-                        dec TICK_DIS
-                        dec TICK_EN
+                        dex
+                        stx TICK_EN
+
+                        ldx TICK_DIS
+                        dex
+                        stx TICK_DIS
+
                         bra TCNT_retornar
 
-TCNT_en_zero            tst TICK_DIS
+TCNT_en_zero            ldx TICK_DIS
+                        cpx #0
                         beq TCNT_check_pflg_off
 
-                        dec TICK_DIS
+                        dex
+                        stx TICK_DIS
 
                         ;; Sólo encender PANT_FLAG si es 0
                         brset Banderas,$08,TCNT_retornar
@@ -357,7 +369,10 @@ TCNT_en_zero            tst TICK_DIS
                         ;; Sólo apagar PANT_FLAG si es 1
 TCNT_check_pflg_off     brclr Banderas,$08,TCNT_retornar
                         bclr Banderas,$08
-                        clr VELOC                                
+                        ;;clr VELOC
+
+                        ;; borrar bandera de interrupción
+                        ldd TCNT                                
 
 TCNT_retornar           rti
 
