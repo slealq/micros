@@ -380,9 +380,9 @@ TCNT_check_pflg_off     brclr Banderas+1,$08,TCNT_retornar
                         ;;clr VELOC
 
                         ;; borrar bandera de interrupción
-                        ldd TCNT                                
+TCNT_retornar           ldd TCNT                                
 
-TCNT_retornar           rti
+                        rti
 
 ;; ==================== Subrutina CALCULAR ===================================
 ;; Descripción: Subrutina de interrupción para puerto H.
@@ -408,7 +408,7 @@ TCNT_retornar           rti
 ;;                   guarda el resultado en VELOC.
 ;; 
 
-CALCULAR                movb Cont_reb Reb_shot
+CALCULAR                movb Cont_reb Reb_shot                  ;; BORRAR
                         tst Cont_reb
                         bne Calc_rst_and_return
 
@@ -421,7 +421,7 @@ Calc_rst_and_return     movb #$FF PIFH
                         bra Calc_retornar
 
 Calc_rst_tick_vel       ;; caso de PH3
-                        inc BIN2
+                        inc BIN2                            ;; BORRAR
                         clr TICK_VEL
                         bset Banderas,$80
 
@@ -432,11 +432,11 @@ Calc_rst_tick_vel       ;; caso de PH3
 Calc_veloc              ;; caso de PH0
                         brclr Banderas,$80,Calc_reset_ph0
 
-                        inc BIN1
+                        inc BIN1                        ;; BORRAR
 
                         ;; calcular denominador
                         ldaa TICK_VEL
-                        staa TEMP
+                        staa TEMP                       ;; BORRAR
                         ldab #64
                         mul
                         tfr d,x
@@ -471,6 +471,10 @@ Calc_reset_ph0          bset PIFH,$01
 
                         ;; la idea, es que después de 40ms, ya no va a haber
                         ;; rebotes, entonces esta interrupción no se va a dar
+
+                        ;; NOTA Usar 40ms no afecta, pues la máxima velocidad
+                        ;; (99km/h) se alcanza cuando se duran 1.44 seg
+                        ;; entre PH3 y PH0.
 Calc_set_cntr           movb #40 Cont_reb                                                 
 
 Calc_retornar           rti
