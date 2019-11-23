@@ -41,6 +41,8 @@
 ;;      + SEND
 ;;      + LCD
 ;;      + CARGAR_LCD
+;;      + PATRON_LEDS
+;;      + CONV_BIN_BCD
 ;;  
 ;; ===========================================================================
 
@@ -54,24 +56,35 @@
 
 EOM:                    equ $0
 N:                      equ 100
-                        ;; Banderas generales
+MAX_BRILLO:             equ 20
+;;                      Banderas generales
 Banderas                ds 2                                            
-                        ;; variables para modo config
-                        ;; variables para tarea_teclado
-                        ;; variables para atd_isr
+;;                      Variables para MODO_CONFIG
+;;                      Variables para TAREA_TECLADO
+;;                      Variables para ATD_ISR
 BRILLO:                 ds 1
 POT:                    ds 1
-                        ;; variables para PANT_CONTRL
+;;                      Variables para PANT_CONTRL
 TICK_EN:                ds 2
 TICK_DIS:               ds 2
-                        ;; variables para CALCULAR
+;;                      Variables para CALCULAR
 VELOC:                  ds 1
 TEMP:                   ds 1
 TEMP2:                  ds 1
 Reb_shot                ds 1
-                        ;; variables para TCNT_ISR
+;;                      Variables para TCNT_ISR
 TICK_VEL:               ds 1
-                        ;; variables para CONV_BIN_BCD                                                
+;;                      Variables para CONV_BIN_BCD
+;;                      Variables para BIN_BCD     
+;;                      Variables para BCD_7SEG    
+;;                      Variables para PATRON_LEDS  
+;;                      Variables para OC4_ISR
+CONT_DIG:               ds 1
+CONT_TICKS:             ds 1
+DT:                     ds 1
+CONT_7SEG:              dw 1                  
+CONT_200:               dw 1                  
+;;                      Variables viejas
 MAX_TCL:                db 2        ;; Set de valor MAX_TCL
 Tecla:                  ds 1
 Tecla_in:               ds 1
@@ -84,9 +97,6 @@ CPROG:                  ds 1
 VMAX:                   db 250
 TIMER_CUENTA:           ds 1
 LEDS:                   db 1
-CONT_DIG:               ds 1
-CONT_TICKS:             ds 1
-DT:                     ds 1
 BIN1:                   db 0
 BIN2:                   db 0
 LOW:                    ds 1
@@ -96,7 +106,6 @@ DISP1:                  db 1
 DISP2:                  db 1
 DISP3:                  db 1
 DISP4:                  db 1
-CONT_7SEG:              dw 1
 Cont_Delay:             ds 1
 D2ms:                   db 100
 D260us:                 db 13
@@ -561,60 +570,70 @@ RTI_retornar            rti
 ;;                    esperando.
 ;;
 
+;;                      -> Inicia primera página ==============================
+                        ;; Recalcular TC4
 OC4_ISR                 ldd TCNT
                         addd #60
                         std TC4
 
+                        ;; Verificar si Cont_Delay = 0
                         tst Cont_Delay
                         beq OC4_MUX
 
                         dec Cont_Delay
 
+                        ;; Verificar si CONT_TICKS = 100
 OC4_MUX                 ldaa CONT_TICKS
                         cmpa #N
-
                         beq OC4_inc_cont_dig
 
+                        ;; Caso donde R1 != 100
                         inc CONT_TICKS
+                        bra OC4_tst_ticks
 
-                        bra OC4_calc_dt
-
+                        ;; Caso R1 = 100 
 OC4_inc_cont_dig        clr CONT_TICKS
                         inc CONT_DIG
 
-                        ldaa CONT_DIG
-                        cmpa #5
-
-                        beq OC4_clr_cont_dig
-
-                        bra OC4_calc_dt
-
-OC4_clr_cont_dig        clr CONT_DIG
-
-OC4_calc_dt             ldaa #100
+                        ;; Calcular valor de K, donde DT = N - K
+                        ldaa #MAX_BRILLO
                         suba BRILLO
                         ldab #N
                         mul
-                        ldx #100
+                        ldx #MAX_BRILLO
                         idiv 
                         tfr x,b
 
+                        ;; Calcular nuevo valor de DT. K se encuentra en R2
                         ldaa #N
                         sba
                         staa DT
 
-                        tst CONT_TICKS
-                        beq OC4_load_val
+                        ;; Verificar si CONT_DIG = 5
+                        ldaa CONT_DIG
+                        cmpa #5
+                        bne OC4_tst_ticks
 
-OC4_check_dt            ldaa CONT_TICKS
+                        clr CONT_DIG
+
+                        ;; Verificar si CONT_TICKS = 0
+OC4_tst_ticks           tst CONT_TICKS
+                        beq OC4_P2A
+
+                        ;; Verificar si CONT_TICKS = DT
+OC4_P2B                 ldaa CONT_TICKS
                         cmpa DT
+                        bne OC4_P2C
 
-                        beq OC4_clean_val
+                        bset PTJ,$02
+                        movb #$0F PTP
 
-                        bra OC4_DEC_Cont7seg
+                        bra OC4_P2C
 
-OC4_load_val            ldaa CONT_DIG
+;;                      -> Inicia segunda página ==============================
+OC4_P2A                 ldaa CONT_DIG
                         
+                        ;; Verificar cuál caso de CONT_DIG estamos
                         cmpa #0
                         beq OC4_ld_0
 
@@ -630,49 +649,60 @@ OC4_load_val            ldaa CONT_DIG
                         cmpa #4
                         beq OC4_ld_4
 
-                        bra OC4_check_dt
+                        ;; Caso de ninguna de las anteriores, regresar
+                        bra OC4_P2B
 
+                        ;; Inician los posibles casos
 OC4_ld_0                movb #$0E PTP
                         bset PTJ,$02
                         movb DISP1 PORTB
-
-                        bra OC4_check_dt
+                        bra OC4_P2B
 
 OC4_ld_1                movb #$0D PTP
                         movb DISP2 PORTB
-
-                        bra OC4_check_dt
+                        bra OC4_P2B
 
 OC4_ld_2                movb #$0B PTP
                         movb DISP3 PORTB 
-
-                        bra OC4_check_dt
+                        bra OC4_P2B
 
 OC4_ld_3                movb #$07 PTP 
                         movb DISP4 PORTB 
-
-                        bra OC4_check_dt
+                        bra OC4_P2B
 
 OC4_ld_4                movb #$0F PTP
                         bclr PTJ,$02
                         movb LEDS PORTB 
+                        bra OC4_P2B                                                                        
 
-                        bra OC4_check_dt                                                                        
-
-OC4_clean_val           bset PTJ,$02
-                        movb #$0F PTP
-
-OC4_DEC_Cont7seg        ldy CONT_7SEG
+;;                      -> Inicia tercera página ==============================
+                        ;; Decrementar CONT_7SEG
+OC4_P2C                 ldy CONT_7SEG
                         dey
                         sty CONT_7SEG
+
+                        ;; Verificar si CONT_7SEG es distinto de 0
                         cpy #0
-                        beq OC4_7seg
+                        bne OC4_CONT_200
+ 
+                        ;; Caso donde CONT_7SEG = 0
+                        jsr CONV_BIN_BCD
+                        jsr BCD_7SEG
+                        movw #5000 CONT_7SEG
 
-                        bra OC4_Retornar
+OC4_CONT_200            ;; Decrementar CONT_200
+                        ldy CONT_200
+                        dey
+                        sty CONT_200
 
-OC4_7seg                jsr BCD_7SEG
+                        ;; Verificar si CONT_200 es distinto de 0
+                        cpy #0
+                        bne OC4_Retornar
 
-                        movw #5000 CONT_7SEG                        
+                        ;; Caso donde CONT_200 = 0
+                        movb #$87 ATD0CTL5
+                        jsr PATRON_LEDS
+                        movw #10000 CONT_200
 
 OC4_Retornar            rti
 
@@ -1310,4 +1340,12 @@ CLCD_ld_l2              ldaa 1,y+
 
                         bra CLCD_ld_l2
 
-CLCD_return             rts                                                                             
+CLCD_return             rts     
+
+;; ==================== Subrutina PATRON_LEDS =================================
+
+PATRON_LEDS             rts
+
+;; ==================== Subrutina CONV_BIN_BCD ================================
+
+CONV_BIN_BCD            rts
