@@ -58,7 +58,7 @@ EOM:                    equ $0
 N:                      equ 100
 MAX_BRILLO:             equ 20
 ;;                      Banderas generales
-Banderas                ds 2                                            
+Banderas                dw 1
 ;;                      Variables para MODO_CONFIG
 ;;                      Variables para TAREA_TECLADO
 ;;                      Variables para ATD_ISR
@@ -249,10 +249,10 @@ MN_check_cprog          tst CPROG
                         beq MN_CFG_check_first
 
                         ;; TCL LISTA
-                        brset Banderas+1,$10,MN_CFG_check_first
+                        brset Banderas+1,$01,MN_CFG_check_first
 
                         ;; TCL_LEIDA
-                        brset Banderas+1,$20,MN_RUN_first
+                        brset Banderas+1,$02,MN_RUN_first
 
                         bra MN_jsr_run
 
@@ -262,7 +262,7 @@ MN_RUN_first            ldx #run_l1
                         jsr Cargar_LCD
 
                         ;; TCL_LEIDA
-                        bclr Banderas+1,$20
+                        bclr Banderas+1,$02
                         movb #$01 LEDS
                         ;;movb #$0F PIEH
                         
@@ -273,7 +273,7 @@ MN_jsr_run              jsr MODO_RUN
 
                         bra MN_jsr_bin_bcd
 
-MN_CFG_check_first      brclr Banderas+1,$20,MN_CFG_first
+MN_CFG_check_first      brclr Banderas+1,$02,MN_CFG_first
 
                         bra MN_jsr_config
 
@@ -284,7 +284,7 @@ MN_CFG_first            ldx #config_l1
 
                         jsr Cargar_LCD
 
-                        bset Banderas+1,$20
+                        bset Banderas+1,$02
                         ;;movb #$FF BIN2
                         ;;movb CPROG BIN1
                         ;;movb #$02 LEDS
@@ -313,11 +313,11 @@ MN_jsr_bin_bcd          jsr BIN_BCD
 
                         brclr PTIH,$80,MN_set_md_run
 
-                        bset Banderas+1,$10
+                        bset Banderas+1,$01
 
                         bra MN_check_cprog_local
 
-MN_set_md_run           bclr Banderas+1,$10
+MN_set_md_run           bclr Banderas+1,$01
 
                         bra MN_check_cprog_local                                            
 
@@ -1343,8 +1343,44 @@ CLCD_ld_l2              ldaa 1,y+
 CLCD_return             rts     
 
 ;; ==================== Subrutina PATRON_LEDS =================================
+;; Descripción: Subrutina para manejar los LEDS de Alerta.
+;; 
+;;  - Cuando la bandera de ALERTA (bit 5 de Banderas) está en 1, cada vez
+;;  que se llame a esta subrutina, barrera los leds del 7 al 3, de izquierda
+;;  a derecha. Sin embargo, si ALERTA está en 0, esta subrutina borrará los
+;;  LEDS del 7 al 3.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: ninguno
+;;
 
-PATRON_LEDS             rts
+PATRON_LEDS             brclr Banderas+1,$10,PT_LEDS_clr
+
+                        ;; Verificar si LEDS > 7
+                        ldaa LEDS
+                        cmpa #7
+                        bhi PT_LEDS_shift
+
+                        bset LEDS,$80
+                        bra PT_LEDS_retornar
+
+PT_LEDS_shift           ;; Guardar en A la parte baja de LEDS
+                        anda #$07
+                        
+                        ;; Shift a la derecha de LEDS, y limpiar parte baja
+                        lsr LEDS
+                        bclr LEDS,$07
+
+                        ;; Sumar LEDS con la parte baja de LEDS anteriormente
+                        ldab LEDS
+                        aba
+                        staa LEDS
+
+                        bra PT_LEDS_retornar
+
+PT_LEDS_clr             bclr LEDS,$F8
+
+PT_LEDS_retornar        rts                                                
 
 ;; ==================== Subrutina CONV_BIN_BCD ================================
 
