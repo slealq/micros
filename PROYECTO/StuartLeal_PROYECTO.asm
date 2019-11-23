@@ -1,7 +1,47 @@
 ;; ===========================================================================
-;; Autor: Stuart Leal Q
+;; Autor: Stuart Leal Quesada | B53777
 ;; Fecha: 19 de noviembre de 2019
 ;; Version: 1.0
+;; Explicación:
+;;
+;;  - Este programa implementa la solución de software llamada RADAR 623.
+;;  Este radar, se encarga de medir la velocidad de un vehículo, y indicarle
+;;  al conductor del vehículo, su velocidad, el límite de velocidad, y 
+;;  alertarlo si su velocidad exede este límite.
+;;
+;;  - Hay tres modos de funcionamiento:
+;;      + MODO LIBRE: En este modo el sistema está ocioso, y no se realiza
+;;                    ningún cálculo.
+;;      + MODO MEDICIÓN: En este modo el sistema está funcionando, y mide
+;;                       la velocidad, basado en el tiempo que le toma a un
+;;                       vehículo pasar entre dos sensores, conectados en PH3
+;;                       y PH0.
+;;                       La velocidad es desplegada utilizando los displays de
+;;                       siete segmentos de la tarjeta Dragon 12.
+;;      + MODO CONFIG: En este modo, el sistema permite la configuración de
+;;                     la velocidad máxima. Se utiliza el teclado matricial
+;;                     para meter datos, y las teclas de Enter y Borrar para
+;;                     manipular la entrada de datos.
+;;
+;;  - Listado de las subrutinas (en orden):
+;;      + ATD0_ISR
+;;      + TCNT_ISR
+;;      + CALCULAR
+;;      + OC4_ISR
+;;      + MUX_TECLADO
+;;      + TAREA_TECLADO
+;;      + FORMAR_ARRAY
+;;      + MODO_RUN
+;;      + MODO_CONFIG
+;;      + BCD_BIN
+;;      + BIN_BCD
+;;      + Single_BIN_BCR
+;;      + BCD_7SEG
+;;      + DELAY
+;;      + SEND
+;;      + LCD
+;;      + CARGAR_LCD
+;;  
 ;; ===========================================================================
 
 #include registers.inc
@@ -478,6 +518,167 @@ Calc_reset_ph0          bset PIFH,$01
 Calc_set_cntr           movb #40 Cont_reb                                                 
 
 Calc_retornar           rti
+
+;; ==================== Subrutina RTI_ISR ====================================
+;; Descripción: Subrutina para decrementar contadores usados para suprimir
+;;              rebotes.
+;;
+;;  - Si se quiere suprimir rebotes, se carga un valor en Cont_reb y esta
+;;  subrutina se encarga de decrementar el contador cada 1ms.
+;; 
+;;  PARAMETROS DE ENTRADA: 
+;;      - Cont_reb: Variable tipo byte en donde se guarda el multiplo de 1ms
+;;                  a decrementas                    
+;;  PARAMETROS DE SALIDA: ninguno
+
+RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
+
+                        tst Cont_reb
+                        beq RTI_retornar
+
+                        dec Cont_reb
+
+RTI_retornar            rti
+
+;; ==================== Subrutina OC4_ISR ====================================
+;; Descripción: Subrutina de interrupción, utilizada para controlar LEDS,
+;;              y conversión analógica digital.
+;;
+;;  - Con el contador CONT_7SEG, se controla que cada 100ms se haga la
+;;  conversión de BIN hasta DISP.
+;;  - Con el contador CONT_200, se controla que cada 200ms se realiza un ciclo
+;;  de conversión analógica digital, y que se ejecutra la subrutina de 
+;;  PATRON_LEDS.
+;;  - Con el contador CONT_TICKS y CONT_DIG, se realiza la multiplexación de
+;;  de la pantalla, y el cálculo del DT, utilizando la variable BRILLO,
+;;  cada vez que CONT_TICKS = N (Hay un cambio de dígito).
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno                    
+;;  PARAMETROS DE SALIDA: 
+;;      - Cont_Delay: Se utiliza en la subrutina DELAY, para implementar un
+;;                    delay bloqueando. La subrutina lee el valor de este
+;;                    contador para determinar si debe continuar o seguir
+;;                    esperando.
+;;
+
+OC4_ISR                 ldd TCNT
+                        addd #60
+                        std TC4
+
+                        tst Cont_Delay
+                        beq OC4_MUX
+
+                        dec Cont_Delay
+
+OC4_MUX                 ldaa CONT_TICKS
+                        cmpa #N
+
+                        beq OC4_inc_cont_dig
+
+                        inc CONT_TICKS
+
+                        bra OC4_calc_dt
+
+OC4_inc_cont_dig        clr CONT_TICKS
+                        inc CONT_DIG
+
+                        ldaa CONT_DIG
+                        cmpa #5
+
+                        beq OC4_clr_cont_dig
+
+                        bra OC4_calc_dt
+
+OC4_clr_cont_dig        clr CONT_DIG
+
+OC4_calc_dt             ldaa #100
+                        suba BRILLO
+                        ldab #N
+                        mul
+                        ldx #100
+                        idiv 
+                        tfr x,b
+
+                        ldaa #N
+                        sba
+                        staa DT
+
+                        tst CONT_TICKS
+                        beq OC4_load_val
+
+OC4_check_dt            ldaa CONT_TICKS
+                        cmpa DT
+
+                        beq OC4_clean_val
+
+                        bra OC4_DEC_Cont7seg
+
+OC4_load_val            ldaa CONT_DIG
+                        
+                        cmpa #0
+                        beq OC4_ld_0
+
+                        cmpa #1
+                        beq OC4_ld_1
+
+                        cmpa #2
+                        beq OC4_ld_2
+
+                        cmpa #3
+                        beq OC4_ld_3
+
+                        cmpa #4
+                        beq OC4_ld_4
+
+                        bra OC4_check_dt
+
+OC4_ld_0                movb #$0E PTP
+                        bset PTJ,$02
+                        movb DISP1 PORTB
+
+                        bra OC4_check_dt
+
+OC4_ld_1                movb #$0D PTP
+                        movb DISP2 PORTB
+
+                        bra OC4_check_dt
+
+OC4_ld_2                movb #$0B PTP
+                        movb DISP3 PORTB 
+
+                        bra OC4_check_dt
+
+OC4_ld_3                movb #$07 PTP 
+                        movb DISP4 PORTB 
+
+                        bra OC4_check_dt
+
+OC4_ld_4                movb #$0F PTP
+                        bclr PTJ,$02
+                        movb LEDS PORTB 
+
+                        bra OC4_check_dt                                                                        
+
+OC4_clean_val           bset PTJ,$02
+                        movb #$0F PTP
+
+OC4_DEC_Cont7seg        ldy CONT_7SEG
+                        dey
+                        sty CONT_7SEG
+                        cpy #0
+                        beq OC4_7seg
+
+                        bra OC4_Retornar
+
+OC4_7seg                jsr BCD_7SEG
+
+                        movw #5000 CONT_7SEG                        
+
+OC4_Retornar            rti
+
+;; ===========================================================================
+;; ==================== SUBRUTINAS GENERALES =================================
+;; ===========================================================================
 
 ;; ==================== Subrutina MUX_TECLADO ================================
 ;; Descripción: Subrutina utilizada para encontrar la tecla presionada
@@ -1109,188 +1310,4 @@ CLCD_ld_l2              ldaa 1,y+
 
                         bra CLCD_ld_l2
 
-CLCD_return             rts                                                                        
-
-;; ==================== Subrutina RTI_ISR ====================================
-;; Descripción: Subrutina para decrementar contadores usados para suprimir
-;;              rebotes.
-;;
-;;  - Si se quiere suprimir rebotes, se carga un valor en Cont_reb y esta
-;;  subrutina se encarga de decrementar el contador cada 1ms.
-;; 
-;;  PARAMETROS DE ENTRADA: 
-;;      - Cont_reb: Variable tipo byte en donde se guarda el multiplo de 1ms
-;;                  a decrementas                    
-;;  PARAMETROS DE SALIDA: ninguno
-
-RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
-
-                        tst Cont_reb
-                        beq RTI_retornar
-
-                        dec Cont_reb
-
-RTI_retornar            rti       
-
-;; ==================== Subrutina PH_ISR ===================================== 
-
-PH_ISR                  tst Cont_reb
-                        beq PH_verify
-
-                        bra PH_return
-
-PH_verify               brset PIFH,$01,PH_do_0
-                        brset PIFH,$02,PH_do_1
-                        brset PIFH,$04,PH_do_2
-                        brset PIFH,$08,PH_do_3
-
-                        movb #$FF PIFH
-                        bra PH_return_cnt
-
-PH_do_0                 bset PIFH,$01
-                        clr Cuenta
-                        bclr PORTE,$04       
-                        bra PH_return_cnt
-
-PH_do_1                 bset PIFH,$02
-                        clr Acumul
-                        bra PH_return_cnt
-
-PH_do_2                 bset PIFH,$04
-                        tst BRILLO
-                        beq PH_return_cnt
-
-                        ldaa BRILLO
-                        suba #5
-                        staa BRILLO
-                        bra PH_return_cnt
-
-PH_do_3                 bset PIFH,$08
-                        ldaa BRILLO
-                        cmpa #100
-
-                        beq PH_return_cnt
-
-                        adda #5
-                        staa BRILLO
-
-PH_return_cnt           movb #10 Cont_reb                        
-
-PH_return               rti
-
-;; ==================== Subrutina OC4_ISR ==================================== 
-
-OC4_ISR                 ldd TCNT
-                        addd #60
-                        std TC4
-
-                        tst Cont_Delay
-                        beq OC4_MUX
-
-                        dec Cont_Delay
-
-OC4_MUX                 ldaa CONT_TICKS
-                        cmpa #N
-
-                        beq OC4_inc_cont_dig
-
-                        inc CONT_TICKS
-
-                        bra OC4_calc_dt
-
-OC4_inc_cont_dig        clr CONT_TICKS
-                        inc CONT_DIG
-
-                        ldaa CONT_DIG
-                        cmpa #5
-
-                        beq OC4_clr_cont_dig
-
-                        bra OC4_calc_dt
-
-OC4_clr_cont_dig        clr CONT_DIG
-
-OC4_calc_dt             ldaa #100
-                        suba BRILLO
-                        ldab #N
-                        mul
-                        ldx #100
-                        idiv 
-                        tfr x,b
-
-                        ldaa #N
-                        sba
-                        staa DT
-
-                        tst CONT_TICKS
-                        beq OC4_load_val
-
-OC4_check_dt            ldaa CONT_TICKS
-                        cmpa DT
-
-                        beq OC4_clean_val
-
-                        bra OC4_DEC_Cont7seg
-
-OC4_load_val            ldaa CONT_DIG
-                        
-                        cmpa #0
-                        beq OC4_ld_0
-
-                        cmpa #1
-                        beq OC4_ld_1
-
-                        cmpa #2
-                        beq OC4_ld_2
-
-                        cmpa #3
-                        beq OC4_ld_3
-
-                        cmpa #4
-                        beq OC4_ld_4
-
-                        bra OC4_check_dt
-
-OC4_ld_0                movb #$0E PTP
-                        bset PTJ,$02
-                        movb DISP1 PORTB
-
-                        bra OC4_check_dt
-
-OC4_ld_1                movb #$0D PTP
-                        movb DISP2 PORTB
-
-                        bra OC4_check_dt
-
-OC4_ld_2                movb #$0B PTP
-                        movb DISP3 PORTB 
-
-                        bra OC4_check_dt
-
-OC4_ld_3                movb #$07 PTP 
-                        movb DISP4 PORTB 
-
-                        bra OC4_check_dt
-
-OC4_ld_4                movb #$0F PTP
-                        bclr PTJ,$02
-                        movb LEDS PORTB 
-
-                        bra OC4_check_dt                                                                        
-
-OC4_clean_val           bset PTJ,$02
-                        movb #$0F PTP
-
-OC4_DEC_Cont7seg        ldy CONT_7SEG
-                        dey
-                        sty CONT_7SEG
-                        cpy #0
-                        beq OC4_7seg
-
-                        bra OC4_Retornar
-
-OC4_7seg                jsr BCD_7SEG
-
-                        movw #5000 CONT_7SEG                        
-
-OC4_Retornar            rti
+CLCD_return             rts                                                                             
