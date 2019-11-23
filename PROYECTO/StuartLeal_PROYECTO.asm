@@ -13,7 +13,9 @@
                         org $1000
 
 EOM:                    equ $0
-N:                      equ 100                        
+N:                      equ 100
+                        ;; Banderas generales
+Banderas                ds 2                                            
                         ;; variables para modo config
                         ;; variables para tarea_teclado
                         ;; variables para atd_isr
@@ -24,6 +26,9 @@ TICK_EN:                ds 2
 TICK_DIS:               ds 2
                         ;; variables para CALCULAR
 VELOC:                  ds 1
+TEMP:                   ds 1
+TEMP2:                  ds 1
+Reb_shot                ds 1
                         ;; variables para TCNT_ISR
 TICK_VEL:               ds 1
                         ;; variables para CONV_BIN_BCD                                                
@@ -33,7 +38,6 @@ Tecla_in:               ds 1
 Cont_reb:               ds 1
 Cont_TCL:               ds 1
 Patron:                 ds 1
-Banderas:               ds 1
 Cuenta:                 ds 1
 Acumul:                 ds 1
 CPROG:                  ds 1
@@ -43,8 +47,8 @@ LEDS:                   db 1
 CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
 DT:                     ds 1
-BIN1:                   db 99
-BIN2:                   db 14
+BIN1:                   db 0
+BIN2:                   db 0
 LOW:                    ds 1
 BCD1:                   ds 1
 BCD2:                   ds 1
@@ -98,7 +102,7 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         dw CALCULAR
 
                         org $3E66
-                        dw TC4_ISR
+                        dw OC4_ISR
 
                         org $3E52
                         dw ATD0_ISR
@@ -126,8 +130,8 @@ MN_After_10us           movb #$30 ATD0CTL3
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
                         movb #$03 TSCR2     ;; Habilitar PRS = 8
-                        ;movb #$10 TIOS      ;; Habiliar OC 4
-                        ;movb #$10 TIE       ;; Empezar oc
+                        movb #$10 TIOS      ;; Habiliar OC 4
+                        movb #$10 TIE       ;; Empezar oc
                         bset TSCR2,$80      ;; habilitar interrupciones por rebase
 
                         ;; para teclado matricial                        
@@ -179,6 +183,7 @@ MN_After_10us           movb #$30 ATD0CTL3
                         clr Cuenta
 
                         clr Banderas
+                        clr Banderas+1
 
                         movb #$FF Tecla
                         movb #$FF Tecla_in
@@ -194,9 +199,11 @@ MN_After_10us           movb #$30 ATD0CTL3
 MN_check_cprog          tst CPROG
                         beq MN_CFG_check_first
 
-                        brset Banderas,$10,MN_CFG_check_first
+                        ;; TCL LISTA
+                        brset Banderas+1,$10,MN_CFG_check_first
 
-                        brset Banderas,$20,MN_RUN_first
+                        ;; TCL_LEIDA
+                        brset Banderas+1,$20,MN_RUN_first
 
                         bra MN_jsr_run
 
@@ -205,9 +212,10 @@ MN_RUN_first            ldx #run_l1
 
                         jsr Cargar_LCD
 
-                        bclr Banderas,$20
+                        ;; TCL_LEIDA
+                        bclr Banderas+1,$20
                         movb #$01 LEDS
-                        movb #$0F PIEH
+                        ;;movb #$0F PIEH
                         
                         clr ACUMUL
                         clr CUENTA
@@ -216,7 +224,7 @@ MN_jsr_run              jsr MODO_RUN
 
                         bra MN_jsr_bin_bcd
 
-MN_CFG_check_first      brclr Banderas,$20,MN_CFG_first
+MN_CFG_check_first      brclr Banderas+1,$20,MN_CFG_first
 
                         bra MN_jsr_config
 
@@ -227,16 +235,16 @@ MN_CFG_first            ldx #config_l1
 
                         jsr Cargar_LCD
 
-                        bset Banderas,$20
-                        movb #$FF BIN2
-                        movb CPROG BIN1
-                        movb #$02 LEDS
-                        movb #$0C PIEH
+                        bset Banderas+1,$20
+                        ;;movb #$FF BIN2
+                        ;;movb CPROG BIN1
+                        ;;movb #$02 LEDS
+                        ;;movb #$0C PIEH
 
                         bclr PORTE,$04
 
                         ;; borrar num_array con FF - BEGIN
-                        bclr Banderas,$04
+                        bclr Banderas+1,$04
                         clra
                         ldab #6             ;; limpiar Num_array
                         ldx #Num_Array
@@ -256,11 +264,11 @@ MN_jsr_bin_bcd          jsr BIN_BCD
 
                         brclr PTIH,$80,MN_set_md_run
 
-                        bset Banderas,$10
+                        bset Banderas+1,$10
 
                         bra MN_check_cprog_local
 
-MN_set_md_run           bclr Banderas,$10
+MN_set_md_run           bclr Banderas+1,$10
 
                         bra MN_check_cprog_local                                            
 
@@ -362,13 +370,13 @@ TCNT_en_zero            ldx TICK_DIS
                         stx TICK_DIS
 
                         ;; Sólo encender PANT_FLAG si es 0
-                        brset Banderas,$08,TCNT_retornar
-                        bset Banderas,$08
+                        brset Banderas+1,$08,TCNT_retornar
+                        bset Banderas+1,$08
                         bra TCNT_retornar 
 
                         ;; Sólo apagar PANT_FLAG si es 1
-TCNT_check_pflg_off     brclr Banderas,$08,TCNT_retornar
-                        bclr Banderas,$08
+TCNT_check_pflg_off     brclr Banderas+1,$08,TCNT_retornar
+                        bclr Banderas+1,$08
                         ;;clr VELOC
 
                         ;; borrar bandera de interrupción
@@ -383,11 +391,16 @@ TCNT_retornar           rti
 ;;  contador que es incrementado periódicamente con la subrutina TCNT_ISR. 
 ;; 
 ;;  Formula para el cálculo:
-;;      velocidad_kmh = (16785 * 200) / (TICK_VEL * 64)
+;;      velocidad_kmh = (16875 * 25) / (TICK_VEL * 64)
 ;;
 ;;      -> Primero se hace la múltiplicación del denominador, y el resultado
 ;;      queda en X. Luego el numerador, y el resultado queda en Y:D. 
 ;;      Y por último, se realiza la división, y el resultado queda en Y.
+;;
+;;  - Sólo se escucha a PIFH 0 si previamente se ha estripado PIFH 3.
+;;  Para esto se usa una bandera en el bit 15 de Banderas. En 0 PIFH 3
+;;  no se estripó, y en 1, ya se estripó anteriomente. Siempre los pulsos
+;;  de PH3 se espera que vengan acompañados de un pulso en PIFH 0.
 ;; 
 ;;  PARAMETROS DE ENTRADA: ninguno
 ;;  PARAMETROS DE SALIDA: 
@@ -395,33 +408,42 @@ TCNT_retornar           rti
 ;;                   guarda el resultado en VELOC.
 ;; 
 
-CALCULAR                tst Cont_reb
-                        bne Calc_retornar
+CALCULAR                movb Cont_reb Reb_shot
+                        tst Cont_reb
+                        bne Calc_rst_and_return
 
                         brset PIFH,$08,Calc_rst_tick_vel
                         brset PIFH,$01,Calc_veloc
 
                         ;; si no es ni PH0 ni PH3, borrar todas
                         ;; y retornar
-                        movb #$FF PIFH
+Calc_rst_and_return     movb #$FF PIFH
                         bra Calc_retornar
 
 Calc_rst_tick_vel       ;; caso de PH3
+                        inc BIN2
                         clr TICK_VEL
+                        bset Banderas,$80
+
                         bset PIFH,$08
 
                         bra Calc_set_cntr
 
 Calc_veloc              ;; caso de PH0
+                        brclr Banderas,$80,Calc_reset_ph0
+
+                        inc BIN1
+
                         ;; calcular denominador
                         ldaa TICK_VEL
+                        staa TEMP
                         ldab #64
                         mul
                         tfr d,x
 
                         ;; calcular numerador
-                        ldd #200
-                        ldy #16785
+                        ldd #25
+                        ldy #16875
                         emul
 
                         ;; realizar división
@@ -434,16 +456,22 @@ Calc_veloc              ;; caso de PH0
                         ;; caso veloc < 255, guardar como está
                         tfr y,a
                         staa VELOC
-                        bra Calc_reset_ph0
+
+                        bra Calc_reset_bandera
 
 Calc_set_max_veloc      ;; caso veloc > 255, guardar tope
-                        movb #255 VELOC                        
+                        movb #255 VELOC
+
+Calc_reset_bandera      bclr Banderas,$80
+
+                        ;;movb VELOC,TEMP2                ;; BORRAR
+                        movb VELOC,LEDS                 ;; BORRAR
 
 Calc_reset_ph0          bset PIFH,$01
 
-                        ;; la idea, es que después de 50ms, ya no va a haber
+                        ;; la idea, es que después de 40ms, ya no va a haber
                         ;; rebotes, entonces esta interrupción no se va a dar
-Calc_set_cntr           movb #50 Cont_reb                                                 
+Calc_set_cntr           movb #40 Cont_reb                                                 
 
 Calc_retornar           rti
 
@@ -558,20 +586,20 @@ TAREA_TECLADO           tst Cont_reb
                         beq TT_Check_antirebote
 
                         ;; banderas.1 = 1 ?
-                        brset Banderas,$02,TT_Check_tecla_igual
+                        brset Banderas+1,$02,TT_Check_tecla_igual
 
                         ;; banderas.1 = 0 => TCL NO LEIDA
                         movb Tecla Tecla_in
-                        bset Banderas,$02 ;; TCL_LEIDA <- 1
+                        bset Banderas+1,$02 ;; TCL_LEIDA <- 1
                         movb #10 Cont_reb
 
                         bra TT_Return
 
-TT_Check_antirebote     brset Banderas,$01,TT_go_formar_array
+TT_Check_antirebote     brset Banderas+1,$01,TT_go_formar_array
                         bra TT_Return
 
-TT_go_formar_array      bclr Banderas,$02
-                        bclr Banderas,$01
+TT_go_formar_array      bclr Banderas+1,$02
+                        bclr Banderas+1,$01
 
                         jsr FORMAR_ARRAY
 
@@ -583,13 +611,13 @@ TT_Check_tecla_igual    ldaa Tecla_in
                         beq TT_Set_tecla_lista
 
                         movb #$FF Tecla
-                        bclr Banderas,$02   ;; TCL_LEIDA
-                        bclr Banderas,$01   ;; TCL_LISTA
+                        bclr Banderas+1,$02   ;; TCL_LEIDA
+                        bclr Banderas+1,$01   ;; TCL_LISTA
                         movb #$FF Tecla_in
 
                         bra TT_Return
 
-TT_Set_tecla_lista      bset Banderas,$01   ;; TCL_LISTA <- 1                                     
+TT_Set_tecla_lista      bset Banderas+1,$01   ;; TCL_LISTA <- 1                                     
 
 TT_Return               rts                    
 
@@ -623,7 +651,7 @@ FA_Middle_Erase         dec Cont_TCL
 
                         bra FA_Return
 
-FA_Middle_End           bset Banderas,$04    ;; Array_ok <- 1
+FA_Middle_End           bset Banderas+1,$04    ;; Array_ok <- 1
                         clr Cont_TCL
 
                         bra FA_Return
@@ -653,7 +681,7 @@ FA_Check_Last           ldaa #$0E
                         bra FA_Return
 
 FA_Last_End             clr Cont_TCL
-                        bset Banderas,$04  ;; Array_ok <- 1
+                        bset Banderas+1,$04  ;; Array_ok <- 1
 
                         bra FA_Return
 
@@ -708,9 +736,9 @@ MODO_CONFIG             tst CPROG
 
                         bra MC_check_bd2
 
-MC_set_bin1             movb CPROG BIN1
+MC_set_bin1             ;;movb CPROG BIN1
 
-MC_check_bd2            brclr Banderas,$04,MC_jsr_tarea_teclado
+MC_check_bd2            brclr Banderas+1,$04,MC_jsr_tarea_teclado
 
                         ldab CPROG
                         pshb
@@ -735,7 +763,7 @@ MC_change_bin1          movb CPROG BIN1
 MC_restore_cprog        stab CPROG
 
 MC_clear_num_array      ;; borrar num_array con FF - BEGIN
-                        bclr Banderas,$04
+                        bclr Banderas+1,$04
                         clra
                         ldab #6             ;; limpiar Num_array
                         ldx #Num_Array
@@ -949,7 +977,7 @@ SEND                    psha
                         lsra
                         staa PORTK
 
-                        brclr Banderas,$80,SE_cmd_h
+                        brclr Banderas+1,$80,SE_cmd_h
 
                         bset PORTK,$01
 
@@ -970,7 +998,7 @@ SE_cmd_h_en             bset PORTK,$02
                         lsla
                         staa PORTK
 
-                        brclr Banderas,$80,SE_cmd_l
+                        brclr Banderas+1,$80,SE_cmd_l
 
                         bset PORTK,$01
 
@@ -1000,7 +1028,7 @@ LC_tst_fin              ldaa iniDISP
 
                         ldx #iniDISP
                         ldaa b,x
-                        bclr Banderas,$80
+                        bclr Banderas+1,$80
 
                         jsr SEND
 
@@ -1013,7 +1041,7 @@ LC_tst_fin              ldaa iniDISP
                         bra LC_tst_fin
 
 LC_clr                  ldaa Clear_LCD
-                        bclr Banderas,$80
+                        bclr Banderas+1,$80
 
                         jsr SEND
 
@@ -1030,7 +1058,7 @@ LC_clr                  ldaa Clear_LCD
 ;; ==================== Subrutina Cargar_LCD =================================
 
 CARGAR_LCD              ldaa ADD_L1
-                        bclr Banderas,$80
+                        bclr Banderas+1,$80
 
                         jsr SEND
 
@@ -1043,7 +1071,7 @@ CLCD_ld_l1              ldaa 1,x+
                         cmpa #EOM
                         beq CLDC_l2
 
-                        bset Banderas,$80
+                        bset Banderas+1,$80
 
                         jsr SEND
 
@@ -1054,7 +1082,7 @@ CLCD_ld_l1              ldaa 1,x+
                         bra CLCD_ld_l1
 
 CLDC_l2                 ldaa ADD_L2
-                        bclr Banderas,$80
+                        bclr Banderas+1,$80
 
                         jsr SEND
 
@@ -1067,7 +1095,7 @@ CLCD_ld_l2              ldaa 1,y+
                         cmpa #EOM
                         beq CLCD_return
 
-                        bset Banderas,$80
+                        bset Banderas+1,$80
 
                         jsr SEND
 
@@ -1146,39 +1174,39 @@ PH_return_cnt           movb #10 Cont_reb
 
 PH_return               rti
 
-;; ==================== Subrutina TC4_ISR ==================================== 
+;; ==================== Subrutina OC4_ISR ==================================== 
 
-TC4_ISR                 ldd TCNT
-                        addd #14
+OC4_ISR                 ldd TCNT
+                        addd #60
                         std TC4
 
                         tst Cont_Delay
-                        beq TC4_MUX
+                        beq OC4_MUX
 
                         dec Cont_Delay
 
-TC4_MUX                 ldaa CONT_TICKS
+OC4_MUX                 ldaa CONT_TICKS
                         cmpa #N
 
-                        beq TC4_inc_cont_dig
+                        beq OC4_inc_cont_dig
 
                         inc CONT_TICKS
 
-                        bra TC4_calc_dt
+                        bra OC4_calc_dt
 
-TC4_inc_cont_dig        clr CONT_TICKS
+OC4_inc_cont_dig        clr CONT_TICKS
                         inc CONT_DIG
 
                         ldaa CONT_DIG
                         cmpa #5
 
-                        beq TC4_clr_cont_dig
+                        beq OC4_clr_cont_dig
 
-                        bra TC4_calc_dt
+                        bra OC4_calc_dt
 
-TC4_clr_cont_dig        clr CONT_DIG
+OC4_clr_cont_dig        clr CONT_DIG
 
-TC4_calc_dt             ldaa #100
+OC4_calc_dt             ldaa #100
                         suba BRILLO
                         ldab #N
                         mul
@@ -1191,74 +1219,74 @@ TC4_calc_dt             ldaa #100
                         staa DT
 
                         tst CONT_TICKS
-                        beq TC4_load_val
+                        beq OC4_load_val
 
-TC4_check_dt            ldaa CONT_TICKS
+OC4_check_dt            ldaa CONT_TICKS
                         cmpa DT
 
-                        beq TC4_clean_val
+                        beq OC4_clean_val
 
-                        bra TC4_DEC_Cont7seg
+                        bra OC4_DEC_Cont7seg
 
-TC4_load_val            ldaa CONT_DIG
+OC4_load_val            ldaa CONT_DIG
                         
                         cmpa #0
-                        beq TC4_ld_0
+                        beq OC4_ld_0
 
                         cmpa #1
-                        beq TC4_ld_1
+                        beq OC4_ld_1
 
                         cmpa #2
-                        beq TC4_ld_2
+                        beq OC4_ld_2
 
                         cmpa #3
-                        beq TC4_ld_3
+                        beq OC4_ld_3
 
                         cmpa #4
-                        beq TC4_ld_4
+                        beq OC4_ld_4
 
-                        bra TC4_check_dt
+                        bra OC4_check_dt
 
-TC4_ld_0                movb #$0E PTP
+OC4_ld_0                movb #$0E PTP
                         bset PTJ,$02
                         movb DISP1 PORTB
 
-                        bra TC4_check_dt
+                        bra OC4_check_dt
 
-TC4_ld_1                movb #$0D PTP
+OC4_ld_1                movb #$0D PTP
                         movb DISP2 PORTB
 
-                        bra TC4_check_dt
+                        bra OC4_check_dt
 
-TC4_ld_2                movb #$0B PTP
+OC4_ld_2                movb #$0B PTP
                         movb DISP3 PORTB 
 
-                        bra TC4_check_dt
+                        bra OC4_check_dt
 
-TC4_ld_3                movb #$07 PTP 
+OC4_ld_3                movb #$07 PTP 
                         movb DISP4 PORTB 
 
-                        bra TC4_check_dt
+                        bra OC4_check_dt
 
-TC4_ld_4                movb #$0F PTP
+OC4_ld_4                movb #$0F PTP
                         bclr PTJ,$02
                         movb LEDS PORTB 
 
-                        bra TC4_check_dt                                                                        
+                        bra OC4_check_dt                                                                        
 
-TC4_clean_val           bset PTJ,$02
+OC4_clean_val           bset PTJ,$02
                         movb #$0F PTP
 
-TC4_DEC_Cont7seg        ldy CONT_7SEG
+OC4_DEC_Cont7seg        ldy CONT_7SEG
                         dey
                         sty CONT_7SEG
                         cpy #0
-                        beq TC4_7seg
+                        beq OC4_7seg
 
-                        bra TC4_Retornar
+                        bra OC4_Retornar
 
-TC4_7seg                jsr BCD_7SEG
+OC4_7seg                jsr BCD_7SEG
 
                         movw #5000 CONT_7SEG                        
 
-TC4_Retornar            rti
+OC4_Retornar            rti
