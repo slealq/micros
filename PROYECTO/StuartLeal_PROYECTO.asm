@@ -247,6 +247,16 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; empieza main
 
+repeat                  ldx #config_l1
+                        ldy #config_l2
+
+                        jsr Cargar_LCD
+
+                        jsr BIN_BCDx
+                        bra repeat                        
+
+
+                        ;; ignorar todo esto de momento
 MN_check_cprog          tst CPROG
                         beq MN_CFG_check_first
 
@@ -1117,6 +1127,7 @@ BBCD_rotate              ;; Realizar corrimiento de todos los registros
 
                         ;; Apilar el valor de A, y realizar AND con parte baja
                         psha
+                        ldaa BCD_L
                         anda #$0F
 
                         ;; Verificar si A < 5
@@ -1130,16 +1141,20 @@ BBCD_rotate              ;; Realizar corrimiento de todos los registros
 BBCD_store_low          tfr a,b
 
                         ;; AND de A con parte Alta
+                        ldaa BCD_L
                         anda #$F0
                         cmpa #$50
                         blo BBCD_add_low
 
+                        ;; Caso donde R1 >= $50
                         adda #$30
 
+                        ;; Caso donde R1 > $50
 BBCD_add_low            aba
                         staa BCD_L
                         pula
 
+                        ;; Ir a BBCD_rotate si y != 0
                         dbne y,BBCD_rotate
 
 BBCD_return             lsla
