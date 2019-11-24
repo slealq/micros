@@ -75,7 +75,9 @@ Reb_shot                ds 1
 ;;                      Variables para TCNT_ISR
 TICK_VEL:               ds 1
 ;;                      Variables para CONV_BIN_BCD
-;;                      Variables para BIN_BCD     
+;;                      Variables para BIN_BCD
+BCD_L:                  ds 1
+BCD_H:                  ds 1      
 ;;                      Variables para BCD_7SEG    
 ;;                      Variables para PATRON_LEDS  
 ;;                      Variables para OC4_ISR
@@ -245,6 +247,16 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; empieza main
 
+repeat                  ldx #config_l1
+                        ldy #config_l2
+
+                        jsr Cargar_LCD
+
+                        jsr BIN_BCDx
+                        bra repeat                        
+
+
+                        ;; ignorar todo esto de momento
 MN_check_cprog          tst CPROG
                         beq MN_CFG_check_first
 
@@ -309,7 +321,7 @@ MN_Check_CleanFin       cba
 
 MN_jsr_config           jsr MODO_CONFIG                                                
 
-MN_jsr_bin_bcd          jsr BIN_BCD
+MN_jsr_bin_bcd          jsr BIN_BCDx
 
                         brclr PTIH,$80,MN_set_md_run
 
@@ -1059,14 +1071,14 @@ BCD_B_add_unit          ldab 0,x
 
 ;; ==================== Subrutina BIN_BCD ====================================                                                                
 
-BIN_BCD                 ldaa BIN1
+BIN_BCDx                ldaa BIN1
                         cmpa #99
 
                         bhi BIN_disable_1
 
-                        jsr Single_BIN_BCR
+                        jsr BIN_BCD
 
-                        stab BCD1
+                        movb BCD_L BCD1
 
                         bra BIN_check_bin2
 
@@ -1077,9 +1089,9 @@ BIN_check_bin2          ldaa BIN2
 
                         bhi BIN_disable_2
 
-                        jsr Single_BIN_BCR
+                        jsr BIN_BCD
 
-                        stab BCD2 
+                        movb BCD_L BCD2 
 
                         bra BIN_fin
 
@@ -1087,48 +1099,67 @@ BIN_disable_2           movb #$FF BCD2
 
 BIN_fin                 rts                        
 
-;; ==================== Subrutina Single_BIN_BCR =============================      
+;; ==================== Subrutina BIN_BCD ====================================
+;; Descripción: Subrutina general para convertir un número binario a BCD.
+;; 
+;;  - El número se pasa por el registro A, y el resultado se retorna por las
+;;  variables BCD_L y BCD_H.
+;; 
+;;  PARAMETROS DE ENTRADA: 
+;;      - A: Por medio del registro A se envía el número binario que se desea
+;;           convertir a BCD.
+;;  PARAMETROS DE SALIDA:
+;;      - BCD_H: Guarda, en el nibble inferior, el tercer dígito (centenas)
+;;               del número binario.
+;;      - BCD_L: Guarda, en el nibbler inferior, las unidades del número
+;;               binario. Y en el nibble del medio, guarda las decenas del
+;;               número binario.
+;;     
 
-Single_BIN_BCR          ldy #7
-                        clrb 
+BIN_BCD                 ldy #7
+                        clr BCD_H
+                        clr BCD_L 
 
-SBB_rotate              lsla
-                        rolb
+BBCD_rotate              ;; Realizar corrimiento de todos los registros
+                        lsla
+                        rol BCD_L
+                        rol BCD_H
 
+                        ;; Apilar el valor de A, y realizar AND con parte baja
                         psha
-
-                        tfr b,a
+                        ldaa BCD_L
                         anda #$0F
 
+                        ;; Verificar si A < 5
                         cmpa #5
-                        bhs SBB_sum_3
+                        blo BBCD_store_low
 
-                        bra SBB_store_low
+                        ;; Caso donde R >= 5
+                        adda #3       
 
-SBB_sum_3               adda #3
+                        ;; Caso donde R < 5
+BBCD_store_low          tfr a,b
 
-SBB_store_low           staa LOW 
-
-                        tfr b,a
+                        ;; AND de A con parte Alta
+                        ldaa BCD_L
                         anda #$F0
-
                         cmpa #$50
-                        bhs SBB_sum_30
+                        blo BBCD_add_low
 
-                        bra SBB_add_low
+                        ;; Caso donde R1 >= $50
+                        adda #$30
 
-SBB_sum_30              adda #$30
-
-SBB_add_low             adda LOW
-                        tfr a,b
+                        ;; Caso donde R1 > $50
+BBCD_add_low            aba
+                        staa BCD_L
                         pula
 
-                        dbeq y,SBB_return
+                        ;; Ir a BBCD_rotate si y != 0
+                        dbne y,BBCD_rotate
 
-                        bra SBB_rotate
-
-SBB_return              lsla
-                        rolb
+BBCD_return             lsla
+                        rol BCD_L
+                        rol BCD_H
 
                         rts                                                                                            
 
