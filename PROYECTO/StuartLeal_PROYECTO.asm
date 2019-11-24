@@ -58,6 +58,17 @@ EOM:                    equ $0
 N:                      equ 100
 MAX_BRILLO:             equ 20
 ;;                      Banderas generales
+;;                      => Se manejan con Banderas+1,[$01,$02,$04,$08,$10,..]
+;;                      Banderas.0 : TCL_LISTA      $01
+;;                      Banderas.1 : TCL_LEIDA      $02
+;;                      Banderas.2 : ARRAY_OK       $04
+;;                      Banderas.3 : PANT_FLAG      $08
+;;                      Banderas.4 : ALERTA         $10
+;;                      Banderas.5 : CFG_FIRST      $20
+;;                      Banderas.6 : MED_FIRST      $40
+;;                      Banderas.7 : LIB_FIRST      $80
+;;                      => Se manejan con Banderas,[$01,$02,$04,$08,$10,..]
+;;                      Banderas.8 : SEND_CMD (0) or SEND_DATA (1)
 Banderas                dw 1
 ;;                      Variables para MODO_CONFIG
 ;;                      Variables para TAREA_TECLADO
@@ -247,13 +258,13 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; empieza main
 
-repeat                  ldx #config_l1
-                        ldy #config_l2
+; repeat                  ldx #config_l1
+;                         ldy #config_l2
 
-                        jsr Cargar_LCD
+;                         jsr CARGAR_LCD
 
-                        jsr BIN_BCDx
-                        bra repeat                        
+;                         jsr BIN_BCDx
+;                         bra repeat                        
 
 
                         ;; ignorar todo esto de momento
@@ -261,22 +272,22 @@ MN_check_cprog          tst CPROG
                         beq MN_CFG_check_first
 
                         ;; TCL LISTA
-                        brset Banderas+1,$01,MN_CFG_check_first
+                        brset Banderas+1,$20,MN_CFG_check_first
 
                         ;; TCL_LEIDA
-                        brset Banderas+1,$02,MN_RUN_first
+                        brset Banderas+1,$40,MN_RUN_first
 
                         bra MN_jsr_run
 
 MN_RUN_first            ldx #run_l1
                         ldy #run_l2
 
-                        jsr Cargar_LCD
+                        jsr CARGAR_LCD
 
                         ;; TCL_LEIDA
-                        bclr Banderas+1,$02
+                        bclr Banderas+1,$40
                         movb #$01 LEDS
-                        ;;movb #$0F PIEH
+                        movb #$0F PIEH
                         
                         clr ACUMUL
                         clr CUENTA
@@ -285,7 +296,7 @@ MN_jsr_run              jsr MODO_RUN
 
                         bra MN_jsr_bin_bcd
 
-MN_CFG_check_first      brclr Banderas+1,$02,MN_CFG_first
+MN_CFG_check_first      brclr Banderas+1,$40,MN_CFG_first
 
                         bra MN_jsr_config
 
@@ -294,13 +305,13 @@ MN_check_cprog_local    bra MN_check_cprog
 MN_CFG_first            ldx #config_l1
                         ldy #config_l2
 
-                        jsr Cargar_LCD
+                        jsr CARGAR_LCD
 
-                        bset Banderas+1,$02
-                        ;;movb #$FF BIN2
-                        ;;movb CPROG BIN1
-                        ;;movb #$02 LEDS
-                        ;;movb #$0C PIEH
+                        bset Banderas+1,$40
+                        movb #$FF BIN2
+                        movb CPROG BIN1
+                        movb #$02 LEDS
+                        movb #$0C PIEH
 
                         bclr PORTE,$04
 
@@ -325,11 +336,11 @@ MN_jsr_bin_bcd          jsr BIN_BCDx
 
                         brclr PTIH,$80,MN_set_md_run
 
-                        bset Banderas+1,$01
+                        bset Banderas+1,$20
 
                         bra MN_check_cprog_local
 
-MN_set_md_run           bclr Banderas+1,$01
+MN_set_md_run           bclr Banderas+1,$20
 
                         bra MN_check_cprog_local                                            
 
@@ -983,7 +994,7 @@ MODO_CONFIG             tst CPROG
 
                         bra MC_check_bd2
 
-MC_set_bin1             ;;movb CPROG BIN1
+MC_set_bin1             movb CPROG BIN1
 
 MC_check_bd2            brclr Banderas+1,$04,MC_jsr_tarea_teclado
 
@@ -1243,7 +1254,7 @@ SEND                    psha
                         lsra
                         staa PORTK
 
-                        brclr Banderas+1,$80,SE_cmd_h
+                        brclr Banderas,$01,SE_cmd_h
 
                         bset PORTK,$01
 
@@ -1264,7 +1275,7 @@ SE_cmd_h_en             bset PORTK,$02
                         lsla
                         staa PORTK
 
-                        brclr Banderas+1,$80,SE_cmd_l
+                        brclr Banderas,$01,SE_cmd_l
 
                         bset PORTK,$01
 
@@ -1294,7 +1305,7 @@ LC_tst_fin              ldaa iniDISP
 
                         ldx #iniDISP
                         ldaa b,x
-                        bclr Banderas+1,$80
+                        bclr Banderas,$01
 
                         jsr SEND
 
@@ -1307,7 +1318,7 @@ LC_tst_fin              ldaa iniDISP
                         bra LC_tst_fin
 
 LC_clr                  ldaa Clear_LCD
-                        bclr Banderas+1,$80
+                        bclr Banderas,$01
 
                         jsr SEND
 
@@ -1317,14 +1328,14 @@ LC_clr                  ldaa Clear_LCD
 
                         jsr DELAY
 
-                        jsr Cargar_LCD
+                        jsr CARGAR_LCD
 
                         rts      
 
-;; ==================== Subrutina Cargar_LCD =================================
+;; ==================== Subrutina CARGAR_LCD =================================
 
 CARGAR_LCD              ldaa ADD_L1
-                        bclr Banderas+1,$80
+                        bclr Banderas,$01
 
                         jsr SEND
 
@@ -1337,7 +1348,7 @@ CLCD_ld_l1              ldaa 1,x+
                         cmpa #EOM
                         beq CLDC_l2
 
-                        bset Banderas+1,$80
+                        bset Banderas,$01
 
                         jsr SEND
 
@@ -1348,7 +1359,7 @@ CLCD_ld_l1              ldaa 1,x+
                         bra CLCD_ld_l1
 
 CLDC_l2                 ldaa ADD_L2
-                        bclr Banderas+1,$80
+                        bclr Banderas,$01
 
                         jsr SEND
 
@@ -1361,7 +1372,7 @@ CLCD_ld_l2              ldaa 1,y+
                         cmpa #EOM
                         beq CLCD_return
 
-                        bset Banderas+1,$80
+                        bset Banderas,$01
 
                         jsr SEND
 
