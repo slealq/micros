@@ -64,11 +64,18 @@ MAX_BRILLO:             equ 20
 ;;                      Banderas.2 : ARRAY_OK       $04
 ;;                      Banderas.3 : PANT_FLAG      $08
 ;;                      Banderas.4 : ALERTA         $10
-;;                      Banderas.5 : CFG_FIRST      $20
-;;                      Banderas.6 : MED_FIRST      $40
-;;                      Banderas.7 : LIB_FIRST      $80
+;;                      Banderas.5 : STATE_CHANGED  $20
+;;                      Banderas.6 : PH6_THEN       $40
+;;                      Banderas.7 : PH7_THEN       $80
 ;;                      => Se manejan con Banderas,[$01,$02,$04,$08,$10,..]
 ;;                      Banderas.8 : SEND_CMD (0) or SEND_DATA (1)
+;;                      Banderas.9 : PANT_FIRST     $02
+;;                      Banderas.10 : --            $04
+;;                      Banderas.11 : --            $08
+;;                      Banderas.12 : --            $10
+;;                      Banderas.13 : --            $20
+;;                      Banderas.14 : --            $40
+;;                      Banderas.15 : PH3_FIRED     $80
 Banderas                dw 1
 ;;                      Variables para MODO_CONFIG
 ;;                      Variables para TAREA_TECLADO
@@ -173,7 +180,7 @@ run_l2:                 fcc 'ACUMUL.-CUENTA'
                         dw TCNT_ISR
 
 ;; ===========================================================================
-;; ==================== RUTINA DE INICIACIÓN =================================
+;; ==================== RUTINA DE INICIALIZACIÓN =============================
 ;; ===========================================================================
 
                         org $2000
@@ -232,10 +239,9 @@ MN_After_10us           movb #$30 ATD0CTL3
                         movb #$FF PIFH
 
 ;; ===========================================================================
-;; ==================== PROGRAMA PRINCIPAL ===================================
+;; ==================== INICIALIZACIÓN DE VARIABLES ==========================
 ;; ===========================================================================
 
-                        ;; inicializar estructuras de datos
                         clr CONT_DIG
                         clr CONT_TICKS
                         movw #5000 CONT_7SEG
@@ -252,20 +258,17 @@ MN_After_10us           movb #$30 ATD0CTL3
                         clr Cont_TCL
                         movb #10 Cont_reb
 
-                        ldx #config_l1
-                        ldy #config_l2
-                        jsr LCD
+;; ===========================================================================
+;; ==================== PROGRAMA PRINCIPAL ===================================
+;; ===========================================================================
 
-                        ;; empieza main
 
-; repeat                  ldx #config_l1
-;                         ldy #config_l2
 
-;                         jsr CARGAR_LCD
+fin                     bra *
 
-;                         jsr BIN_BCDx
-;                         bra repeat                        
-
+;; ===========================================================================
+;; ==================== PROGRAMA VIEJO =======================================
+;; ===========================================================================
 
                         ;; ignorar todo esto de momento
 MN_check_cprog          tst CPROG
