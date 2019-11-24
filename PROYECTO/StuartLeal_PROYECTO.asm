@@ -127,19 +127,19 @@ Clear_LCD:              db $01
 ADD_L1:                 db $80
 ADD_L2:                 db $C0
 
-                        org $1030
+                        org $1040
 Num_Array:              ds 6
 
-                        org $1040
+                        org $1050
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 
-                        org $1050
+                        org $1060
 SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F
 
-                        org $1060
+                        org $1070
 iniDISP:                db $04,$28,$28,$06,$0C
 
-                        org $1070
+                        org $1080
 iniMensajes:
 config_l1:              fcc 'MODO CONFIG'
                         db EOM
