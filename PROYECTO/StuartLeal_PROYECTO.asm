@@ -519,7 +519,7 @@ TCNT_retornar           ldd TCNT
 ;;                   guarda el resultado en VELOC.
 ;; 
 
-CALCULAR                movb Cont_reb Reb_shot                  ;; BORRAR
+CALCULAR                ;;movb Cont_reb Reb_shot                  ;; BORRAR
                         tst Cont_reb
                         bne Calc_rst_and_return
 
@@ -536,7 +536,7 @@ Calc_rst_tick_vel       ;; caso de PH3
                         brset Banderas,$80,Calc_rst_ph3
 
                         ;; Caso donde es la primera vez, activar PH3_FIRED
-                        inc BIN2                            ;; BORRAR
+                        ;;inc BIN2                            ;; BORRAR
                         clr TICK_VEL
                         bset Banderas,$80
 
@@ -548,17 +548,27 @@ Calc_rst_ph3            bset PIFH,$08
 Calc_veloc              ;; caso de PH0
                         brclr Banderas,$80,Calc_reset_ph0
 
+                        ;; Deshabilitar interrupciones para el puerto H
+                        clr PIEH
+                        ;; Habilitar interrupciones (OC4) para DELAY
+                        cli
+
                         ;; Caso donde PH3_FIRED = 1 -> Vehículo detectado
                         ;; Cambiar mensajes de LCD de medicion
                         ldx #MED_L1
                         ldy #MED_CAL_L2
                         jsr LCD
 
-                        inc BIN1                        ;; BORRAR
+                        ;; Deshabilitar interrupciones nuevamente
+                        sei
+                        ;; Habilitar interrupciones para el puerto H
+                        movb #$09 PIEH
+
+                        ;;inc BIN1                        ;; BORRAR
 
                         ;; calcular denominador
                         ldaa TICK_VEL
-                        staa TEMP                       ;; BORRAR
+                        ;;staa TEMP                       ;; BORRAR
                         ldab #64
                         mul
                         tfr d,x
@@ -587,7 +597,7 @@ Calc_set_max_veloc      ;; caso veloc > 255, guardar tope
 Calc_reset_bandera      bclr Banderas,$80
 
                         ;;movb VELOC,TEMP2                ;; BORRAR
-                        movb VELOC,LEDS                 ;; BORRAR
+                        ;;movb VELOC,LEDS                 ;; BORRAR
 
 Calc_reset_ph0          bset PIFH,$01
 
@@ -1171,13 +1181,13 @@ PTC_calc                ;; Caso donde CALC_TICS = 1, no se han hecho calculos
                         ;; Velocidad válida, pero hay que calcular el valor
                         ;; de TICK_EN, y de TICK_DIS
 PTC_calculate           ldaa VELOC
-                        tfr a,j
+                        tfr a,x
                         ldd #360        ;; Constante para 100m
                         idiv
                         stx TICK_EN
 
                         ldaa VELOC
-                        tfr a,j
+                        tfr a,x
                         ldd #720        ;; Constante para 200m
                         idiv
                         stx TICK_EN
