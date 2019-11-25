@@ -10,18 +10,26 @@
 ;;  alertarlo si su velocidad exede este límite.
 ;;
 ;;  - Hay tres modos de funcionamiento:
-;;      + MODO LIBRE: En este modo el sistema está ocioso, y no se realiza
-;;                    ningún cálculo.
+;;      + MODO LIBRE:    En este modo el sistema está ocioso, y no se realiza
+;;                       ningún cálculo.
+;;      
+;;                       Código: PH7-PH6 = ON-OFF
+;;
 ;;      + MODO MEDICIÓN: En este modo el sistema está funcionando, y mide
 ;;                       la velocidad, basado en el tiempo que le toma a un
 ;;                       vehículo pasar entre dos sensores, conectados en PH3
 ;;                       y PH0.
 ;;                       La velocidad es desplegada utilizando los displays de
 ;;                       siete segmentos de la tarjeta Dragon 12.
-;;      + MODO CONFIG: En este modo, el sistema permite la configuración de
-;;                     la velocidad máxima. Se utiliza el teclado matricial
-;;                     para meter datos, y las teclas de Enter y Borrar para
-;;                     manipular la entrada de datos.
+;;
+;;                       Código: PH7-PH6 = ON-ON
+;;
+;;      + MODO CONFIG:   En este modo, el sistema permite la configuración de
+;;                       la velocidad máxima. Se utiliza el teclado matricial
+;;                       para meter datos, y las teclas de Enter y Borrar para
+;;                       manipular la entrada de datos.
+;;
+;;                       Código: PH7-PH6 = OFF-OFF
 ;;
 ;;  - Listado de las subrutinas (en orden):
 ;;      + ATD0_ISR
@@ -31,8 +39,10 @@
 ;;      + MUX_TECLADO
 ;;      + TAREA_TECLADO
 ;;      + FORMAR_ARRAY
-;;      + MODO_RUN
+;;      + MODO_MEDICION
+;;      + PANT_CTRL
 ;;      + MODO_CONFIG
+;;      + MODO_LIBRE
 ;;      + BCD_BIN
 ;;      + BIN_BCD
 ;;      + Single_BIN_BCR
@@ -69,15 +79,16 @@ MAX_BRILLO:             equ 20
 ;;                      Banderas.7 : PH7_THEN       $80
 ;;                      => Se manejan con Banderas,[$01,$02,$04,$08,$10,..]
 ;;                      Banderas.8 : SEND_CMD (0) or SEND_DATA (1)
-;;                      Banderas.9 : PANT_FIRST     $02
+;;                      Banderas.9 : CALC_TICKS     $02
 ;;                      Banderas.10 : --            $04
 ;;                      Banderas.11 : --            $08
 ;;                      Banderas.12 : --            $10
 ;;                      Banderas.13 : --            $20
 ;;                      Banderas.14 : --            $40
 ;;                      Banderas.15 : PH3_FIRED     $80
-Banderas                dw 1
+Banderas:               dw 1
 ;;                      Variables para MODO_CONFIG
+V_LIM:                  ds 1
 ;;                      Variables para TAREA_TECLADO
 ;;                      Variables para ATD_ISR
 BRILLO:                 ds 1
@@ -113,12 +124,11 @@ Cont_TCL:               ds 1
 Patron:                 ds 1
 Cuenta:                 ds 1
 Acumul:                 ds 1
-CPROG:                  ds 1
 VMAX:                   db 250
 TIMER_CUENTA:           ds 1
 LEDS:                   db 1
-BIN1:                   db 0
-BIN2:                   db 0
+BIN1:                   ds 1
+BIN2:                   ds 1
 LOW:                    ds 1
 BCD1:                   ds 1
 BCD2:                   ds 1
@@ -134,31 +144,45 @@ Clear_LCD:              db $01
 ADD_L1:                 db $80
 ADD_L2:                 db $C0
 
-                        org $1040
 Num_Array:              ds 6
 
-                        org $1050
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 
-                        org $1060
-SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F
+SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$00,$40
 
-                        org $1070
 iniDISP:                db $04,$28,$28,$06,$0C
 
-                        org $1080
 iniMensajes:
-config_l1:              fcc 'MODO CONFIG'
+;;                      Mensajes de configuración
+CONFIG_L1:              fcc '  MODO CONFIG'
                         db EOM
 
-config_l2:              fcc 'INGRESE CPROG.'                        
+CONFIG_L2:              fcc ' VELOC. LIMITE'                        
                         db EOM
 
-run_l1:                 fcc 'MODO RUN'                        
+;;                      Mensajes de medición                        
+
+MED_L1:                 fcc ' MODO MEDICION'                        
                         db EOM
 
-run_l2:                 fcc 'ACUMUL.-CUENTA'      
+MED_ESP_L2:             fcc '  ESPERANDO...'
+                        db EOM
+
+MED_VEL_L2:             fcc 'SU VEL. VEL.LIM'
+                        db EOM
+
+MED_CAL_L2:             fcc '  CALCULANDO...'
+                        db EOM
+
+;;                      Mensajes de modo libre                        
+
+MODO_LIB_L1:            fcc '  RADAR   623'                        
+                        db EOM
+
+MODO_LIB_L2:            fcc '  MODO LIBRE'      
                         db EOM                  
+
+
 
 ;; ===========================================================================
 ;; ==================== DECLARACION DE INTERRUPCIONES ========================
@@ -201,7 +225,6 @@ MN_After_10us           movb #$30 ATD0CTL3
                         movb #$03 TSCR2     ;; Habilitar PRS = 8
                         movb #$10 TIOS      ;; Habiliar OC 4
                         movb #$10 TIE       ;; Empezar oc
-                        bset TSCR2,$80      ;; habilitar interrupciones por rebase
 
                         ;; para teclado matricial                        
                         movb #$F0 DDRA      ;; 4msb como entradas de PORTA
@@ -232,10 +255,9 @@ MN_After_10us           movb #$30 ATD0CTL3
                         ;; habilitar puerto p (tierras de disp)
                         movb #$0F DDRP
 
-                        ;; habilitar puerto boton: 0,1,2,3,7 y flanco dec
+                        ;; habilitar H como entrada, flanco decreciente en 0,3
                         clr DDRH
-                        movb #$09 PIEH      ;; habilitar interrupcion PH3 y PH0
-                        movb #$F0 PPSH
+                        movb #$F6 PPSH
                         movb #$FF PIFH
 
 ;; ===========================================================================
@@ -246,7 +268,7 @@ MN_After_10us           movb #$30 ATD0CTL3
                         clr CONT_TICKS
                         movw #5000 CONT_7SEG
 
-                        clr CPROG
+                        clr V_LIM
                         clr Acumul
                         clr Cuenta
 
@@ -258,96 +280,111 @@ MN_After_10us           movb #$30 ATD0CTL3
                         clr Cont_TCL
                         movb #10 Cont_reb
 
+                        ;; inicialización nueva
+                        bclr Banderas,$C0 ;; limpiar bit 7 y 6
+                        clr PIEH
+
+                        ;; imprimir mensaje de config primera vez
+                        ldx #CONFIG_L1
+                        ldy #CONFIG_L2
+                        jsr LCD
+
+                        ;; set leds en config
+                        movb #$01,LEDS
+
+                        ;; limpiar banderas de:
+                        bclr Banderas,$80 ;; PH3_FIRED
+                        bset Banderas,$02 ;; CALC_TICKS
+                        bclr Banderas+1,$10 ;; ALERTA
+                        bclr Banderas+1,$08 ;; PANT_FLAG
+                        bclr Banderas+1,$20 ;; STATE_CHANGED
+
+                        ;; limpiar posibles calculos
+                        clr VELOC
+                        movb #$ff,BIN1  ;; $BB
+                        movb #$ff,BIN2  ;; $BB
+
+                        ;; limpiar limite de velocidad
+                        clr V_LIM
+
+                        ;; limpiar bandera de ARRAY_OK
+                        bclr Banderas+1,$04
+
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
 
+MN2                     ;; Traer sólo los bits de estado de PTH y Banderas+1
+                        ldaa Banderas+1
+                        anda #$C0
+                        ldab PTIH
+                        andb #$C0
 
+                        ;; Verificar si V_LIM = 0, en cuyo caso ir a CFG
+                        tst V_LIM
+                        beq MN2_cfg_mode
 
-fin                     bra *
+                        ;; Verificar si R2 != $40
+                        cmpb #$40
+                        bne MN2_chk_r1_eq_r2
 
-;; ===========================================================================
-;; ==================== PROGRAMA VIEJO =======================================
-;; ===========================================================================
+                        ;; Caso R2 = $40 -> Estado indefinido
+                        tfr a,b
 
-                        ;; ignorar todo esto de momento
-MN_check_cprog          tst CPROG
-                        beq MN_CFG_check_first
+MN2_chk_r1_eq_r2        cba
+                        beq MN2_clr_state_chgd
 
-                        ;; TCL LISTA
-                        brset Banderas+1,$20,MN_CFG_check_first
-
-                        ;; TCL_LEIDA
-                        brset Banderas+1,$40,MN_RUN_first
-
-                        bra MN_jsr_run
-
-MN_RUN_first            ldx #run_l1
-                        ldy #run_l2
-
-                        jsr CARGAR_LCD
-
-                        ;; TCL_LEIDA
-                        bclr Banderas+1,$40
-                        movb #$01 LEDS
-                        movb #$0F PIEH
-                        
-                        clr ACUMUL
-                        clr CUENTA
-
-MN_jsr_run              jsr MODO_RUN
-
-                        bra MN_jsr_bin_bcd
-
-MN_CFG_check_first      brclr Banderas+1,$40,MN_CFG_first
-
-                        bra MN_jsr_config
-
-MN_check_cprog_local    bra MN_check_cprog
-
-MN_CFG_first            ldx #config_l1
-                        ldy #config_l2
-
-                        jsr CARGAR_LCD
-
-                        bset Banderas+1,$40
-                        movb #$FF BIN2
-                        movb CPROG BIN1
-                        movb #$02 LEDS
-                        movb #$0C PIEH
-
-                        bclr PORTE,$04
-
-                        ;; borrar num_array con FF - BEGIN
-                        bclr Banderas+1,$04
-                        clra
-                        ldab #6             ;; limpiar Num_array
-                        ldx #Num_Array
-
-MN_Check_CleanFin       cba
-                        beq MN_jsr_config
-
-                        movb #$FF a,x
-                        inca
-
-                        bra MN_Check_CleanFin
-                        ;; borrar num_array con FF - END
-
-MN_jsr_config           jsr MODO_CONFIG                                                
-
-MN_jsr_bin_bcd          jsr BIN_BCDx
-
-                        brclr PTIH,$80,MN_set_md_run
-
+                        ;; Estado diferente al anterior!
                         bset Banderas+1,$20
 
-                        bra MN_check_cprog_local
+                        ;; Guardar nuevo estado en Banderas
+                        ;; y dejar R2 nuevamente con sólo el estado
+                        bclr Banderas+1,$C0
+                        addb Banderas+1
+                        stab Banderas+1
+                        andb #$C0
 
-MN_set_md_run           bclr Banderas+1,$20
+                        bra MN2_chk_med_mode                        
 
-                        bra MN_check_cprog_local                                            
+MN2_clr_state_chgd      bclr Banderas+1,$20
 
-MN_fin                  bra *
+MN2_chk_med_mode        ;; Caso donde V_LIM != 0
+                        cmpb #$C0
+                        beq MN2_med_mode
+
+                        ;; Caso donde mode != medicion
+                        brclr Banderas+1,$20,MN2_chk_mode
+
+                        ;; Caso donde primera vez que modo != medicion
+                        bclr TSCR2,$80
+                        clr PIEH
+
+                        clr VELOC
+                        movb #$ff,BIN1 ;; $BB 
+                        movb #$ff,BIN2 ;; $BB 
+
+                        bclr Banderas,$80 ;; PH3_FIRED
+                        bset Banderas,$02 ;; CALC_TICKS
+                        bclr Banderas+1,$10 ;; ALERTA
+                        bclr Banderas+1,$08 ;; PANT_FLAG
+
+                        ;; Verificar si modo = CONFIG | LIBRE
+MN2_chk_mode            cmpb #$00
+                        beq MN2_cfg_mode
+
+                        ;; Caso donde mode TIENE que ser MODO_LIBRE
+                        jsr MODO_LIBRE
+                        bra MN2
+
+MN2_cfg_mode            ;; Caso donde estamos en MODO_CONFIG
+                        jsr MODO_CONFIG
+                        bra MN2                        
+
+MN2_med_mode            ;; Caso donde estamos en MODO_MEDICION
+                        jsr MODO_MEDICION
+                        bra MN2                        
+
+fin                     bra *
 
 ;; ===========================================================================
 ;; ==================== SUBRUTINAS DE INTERRUPCIONES =========================
@@ -452,7 +489,6 @@ TCNT_en_zero            ldx TICK_DIS
                         ;; Sólo apagar PANT_FLAG si es 1
 TCNT_check_pflg_off     brclr Banderas+1,$08,TCNT_retornar
                         bclr Banderas+1,$08
-                        ;;clr VELOC
 
                         ;; borrar bandera de interrupción
 TCNT_retornar           ldd TCNT                                
@@ -496,16 +532,27 @@ Calc_rst_and_return     movb #$FF PIFH
                         bra Calc_retornar
 
 Calc_rst_tick_vel       ;; caso de PH3
+                        ;; Verificar si PH3_FIRED ya fué activada
+                        brset Banderas,$80,Calc_rst_ph3
+
+                        ;; Caso donde es la primera vez, activar PH3_FIRED
                         inc BIN2                            ;; BORRAR
                         clr TICK_VEL
                         bset Banderas,$80
 
-                        bset PIFH,$08
+                        ;; Ya se había activado PH3_FIRED previamente
+Calc_rst_ph3            bset PIFH,$08
 
                         bra Calc_set_cntr
 
 Calc_veloc              ;; caso de PH0
                         brclr Banderas,$80,Calc_reset_ph0
+
+                        ;; Caso donde PH3_FIRED = 1 -> Vehículo detectado
+                        ;; Cambiar mensajes de LCD de medicion
+                        ldx #MED_L1
+                        ldy #MED_CAL_L2
+                        jsr LCD
 
                         inc BIN1                        ;; BORRAR
 
@@ -953,100 +1000,341 @@ FA_Last_Erase           dec Cont_TCL
 
 FA_Return               rts
 
-;; ==================== Subrutina MODO_RUN ===================================
+;; ==================== Subrutina MODO_MEDICION ==============================
+;; Descripción: Subrutina que atiende el MODO_MEDICION, el modo activo del 
+;;              RADAR.
+;; 
+;;  - Esta subrutina se encarga de manejar el control de los mensajes,
+;;  y calculos necesarios para calcular correctamente la velocidad del 
+;;  vehíuclo que pasa entre los sensores de S1 y S2.
+;;  - Se encarga de llamar a PANT_CTRL una vez que detecta que la velocidad
+;;  medida por el radar != 0. PANT_CTRL se sigue ejecutando mientras esa
+;;  velocidad sea != 0.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - V_LIM:      Esta subrutina utiliza el valor de V_LIM para determinar
+;;                    si tiene que llamar a la subrutina de PANT_CTRL o no.
+;;  PARAMETROS DE SALIDA: 
+;;      - LEDS:       En esta variable, se configura el LED correspondiente
+;;                    que indica que se encuentra en este modo.
+;;
+;;  ESTADOS INTERNOS:
+;;      - Banderas.5: Esta bandera de STATE_CHANGE, es utilizada para verificar
+;;                    si es la primera vez que se ejecuta esta subrutina
+;;                    después de haber estado en otro modo. En cuyo caso,
+;;                    se tiene que habilitar las interrupciones por OVERFLOW
+;;                    de TCNT, y las interrupciones de Key Wakeups del puerto
+;;                    H para el pin 3 y el pin 0.
+;;                                                                               
 
-MODO_RUN                ldaa CUENTA
-                        cmpa CPROG
+                        ;; Verificar si esta es la primera vez que entramos
+                        ;; a este modo
+MODO_MEDICION           brclr Banderas+1,$20,MM_chk_veloc
 
-                        beq MR_update_and_return
+                        ;; Caso donde es la primera vez que se entra
+                        ;; a esta subrutina
+                        bset TSCR2,$80      ;; Habilitar int de overflow TCNT
+                        movb #$09,PIEH      ;; Habilitar keywakeups PH3 y PH0
+                        movb #$02,LEDS      ;; Poner el modo en los LEDS
 
-                        tst TIMER_CUENTA
-                        beq MR_inc_cuenta
+                        ;; Cargar en el LCD los mensajes correspondientes
+                        ldx #MED_L1
+                        ldy #MED_ESP_L2
+                        jsr LCD
 
-                        bra MR_update_and_return
+                        ;; Verificar si VELOC = 0
+MM_chk_veloc            tst VELOC
+                        beq MM_retornar
 
-MR_inc_cuenta           movb VMAX TIMER_CUENTA
-                        inc CUENTA
-                        ldaa CUENTA
+                        ;; Caso donde VELOC != 0
+                        jsr PANT_CTRL
 
-                        cmpa CPROG
-                        beq MR_inc_acumul
+                        ;; Caso donde VELOC = 0
+MM_retornar             rts
 
-                        bra MR_update_and_return
+;; ==================== Subrutina PANT_CTRL ==================================
+;; Descripción: Subrutina que orquestra la lógica cuando VELOC != 0.
+;; 
+;;  - Cuando la VELOC calculada es distinta de 0, esta subrutina debe
+;;  realizar varias tarea:
+;;      + Verificar que VELOC esté dentro de los rangos permitiros (30-99).
+;;      + Cuando VELOC está fuera del rango, se debe mostrar '--' en vez
+;;      de la velocidad.
+;;      + Verificar si VELOC es mayor que V_LIM. En cuyo caso, debe encender
+;;      la bandera de ALERTA (Banderas.4) para indicar a PATRON_LEDS que
+;;      debe iniciar la secuencia.
+;;      + Realizar los cálculos para TICK_EN y TICK_DIS. Estos son la cantidad
+;;      de TICKS que se deben contar en TCNT, para que cuando el vehículo
+;;      este a 100m de la pantalla, TICK_EN = 0, y además, cuando el vehículo
+;;      este debajo de la pantalla, TICKS_DIS = 0.
+;;      + Orquestrar la lógica de cambiar los mensajes del LCD, y del display
+;;      de 7 segmentos, para que cuando el vehículo esté a 100m de ambos,
+;;      se indique la velocidad límite y la velocidad que lleva.
+;;      + Orquestrar la lógica de apagar los displays de 7 segmentos cuando
+;;      el vehículo está por debajo del display, y además, devolver VELOC = 0.
+;;
+;;      NOTA: Cuando se encuentra que VELOC != 0, la primera vez se debe
+;;      deshabilitar las interrupciones del puerto H para impedir que se
+;;      realice otra medición durante la secuencia descrita anteriormente.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - V_LIM:      Esta subrutina utiliza el valor de V_LIM para determinar
+;;                    si tiene que llamar a la subrutina de PANT_CTRL o no.
+;;  PARAMETROS DE SALIDA: 
+;;      - LEDS:       En esta variable, se configura el LED correspondiente
+;;                    que indica que se encuentra en este modo.
+;;
+;;  ESTADOS INTERNOS:
+;;      - Banderas.5: Esta bandera de STATE_CHANGE, es utilizada para verificar
+;;                    si es la primera vez que se ejecuta esta subrutina
+;;                    después de haber estado en otro modo. En cuyo caso,
+;;                    se tiene que habilitar las interrupciones por OVERFLOW
+;;                    de TCNT, y las interrupciones de Key Wakeups del puerto
+;;                    H para el pin 3 y el pin 0.
+;; 
 
-MR_inc_acumul           inc ACUMUL
-                        bset PORTE,$04     
+PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
+                        clr PIEH
 
-                        ldaa ACUMUL
+                        ;; Verificar si CALC_TICKS = 1
+                        brset Banderas,$02,PTC_calc
+
+                        ;; Caso donde CALC_TICKS = 0, ya se hicieron los calc
+                        ldaa BIN1
+
+                        ;; Verificar si PANT_FLAG = 1
+                        brset Banderas,$08,PTC_chk_vel
+
+                        ;; Caso donde PANT_FLAG = 0
+                        ;; Verificar si BIN1 tiene V_LIM o no ($BB)
+                        cmpa #$ff
+                        beq PTC_local_return
+
+                        ;; Caso donde R1 != $BB, PANT_FLAG = 0
+                        ;; Acá, previamente el LCD estuvo encendido
+                        ;; con el mensaje de la velocidad calculada, y ahora
+                        ;; tenemos que apagarlo, y reiniciar el estado
+                        ;; a ESPERANDO...
+
+                        ;; Actualizar mensaje
+                        ldx #MED_L1
+                        ldy #MED_ESP_L2
+                        jsr LCD
+
+                        ;; Reiniciar variables
+                        movb #$ff BIN1 ;; $BB
+                        movb #$ff BIN2 ;; $BB
+                        clr VELOC
+                        movb #$09 PIEH
+                        bset Banderas,$02 ;; Poner CALC_TICKS = 1
+                        bclr Banderas+1,$10 ;; Ponert ALERTA = 0
+
+                        bra PTC_retornar
+
+PTC_chk_vel             ;; Caso donde PANT_FLAG = 1
+                        ;; Verificar si BIN1 tiene V_LIM o no ($BB)
+                        cmpa #$ff ;; $BB 
+                        bne PTC_retornar
+
+                        ;; Caso donde R1 = $BB, PANT_FLAG = 1
+                        ;; Este es el caso donde HAY que encender el LCD
+                        ;; porque el vehículo está a 100m de la pantalla
+                        
+                        ;; Actualizar mensaje
+                        ldx #MED_L1
+                        ldy #MED_VEL_L2
+                        jsr LCD 
+
+                        ;; Poner V_LIM y VELOC en 7 segmentos
+                        movb V_LIM BIN1
+                        movb VELOC BIN2
+
+PTC_local_return        bra PTC_retornar
+
+PTC_calc                ;; Caso donde CALC_TICS = 1, no se han hecho calculos
+                        ;; Verificar si CALC < 30
+                        ldaa VELOC
+                        cmpa #30
+                        blo PTC_invalid_vel
+
                         cmpa #99
-                        bhi MR_clr_acumul
+                        bhi PTC_invalid_vel
 
-                        bra MR_update_and_return
+                        ;; La velocidad es válida, pero hay que verificar
+                        ;; si la velocidad es más alta que el límite, y
+                        ;; en dado caso, encender la ALERTA
+                        cmpa V_LIM
+                        bls PTC_calculate
 
-MR_clr_acumul           clr ACUMUL
+                        bset Banderas+1,$10 ;; Poner en 1 ALERTA
 
-MR_update_and_return    movb CUENTA BIN1
-                        movb ACUMUL BIN2
+                        ;; Velocidad válida, pero hay que calcular el valor
+                        ;; de TICK_EN, y de TICK_DIS
+PTC_calculate           ldaa VELOC
+                        tfr a,j
+                        ldd #360        ;; Constante para 100m
+                        idiv
+                        stx TICK_EN
 
-                        rts                                                       
+                        ldaa VELOC
+                        tfr a,j
+                        ldd #720        ;; Constante para 200m
+                        idiv
+                        stx TICK_EN
+
+                        bra PTC_calc_finish
+
+                        ;; Caso donde VELOC tiene una velocidad inválida
+PTC_invalid_vel         movw #1 TICK_EN     ;; Cargar 1 en TICK_EN 
+                        movw #92 TICK_DIS   ;; Suficiente para que dure 2 seg
+
+                        ;; Cargar velocidad límite, y '--' en velocidad
+                        movb V_LIM BIN1
+                        movb #$FF BIN2              ;; Aqui va $AA      
+
+PTC_calc_finish         bclr Banderas,$02   ;; Borrar bandera de CALC_TICKS   
+
+PTC_retornar            rts
 
 ;; ==================== Subrutina MODO_CONFIG ================================
+;; Descripción: Subrutina que atiende el MODO_CONFIG, donde se configura V_LIM.
+;; 
+;;  - Mediante el uso del teclado matricial, esta subrutina se encarga de
+;;  verificar si el usuario ha ingresado un valor válido o no. En caso de que
+;;  la respuesta sea sí, se guarda el valor válido en la variable V_LIM como
+;;  una variable en binario.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: 
+;;      - V_LIM:      Esta subrutina es la encargada de definir V_LIM, y
+;;                    verificar que el valor está en un rango permitido.
+;;
+;;      - BIN1:       El valor actual de V_LIM se guarda en BIN1 cuando
+;;                    el programa se encuentra en MODO_CONFIG, para que el
+;;                    usuario lo pueda ver.
+;;  ESTADOS INTERNOS:
+;;      - Banderas.2: Esta es la bandera de ARRAY_OK, y esta subrutina se
+;;                    encarga de modificar esta bandera, para forzar a 
+;;                    TAREA_TECLADO a volver a iniciar el proceso de leer
+;;                    teclas.
+;;      - Banderas.5: Esta bandera indica si el estado cambio. Es decir,
+;;                    esta es la primera vez que se entra a MODO_CONFIG.
+;;
 
-MODO_CONFIG             tst CPROG
-                        beq MC_set_bin1
+                        ;; Verificar si esta es la primera vez que se
+                        ;; entra a MODO_CONFIG
+MODO_CONFIG             brclr Banderas+1,$20,MC_chk_v_lim
 
-                        bra MC_check_bd2
+                        ;; Primera vez que se entra a MODO_CONFIG
+                        ldx #CONFIG_L1
+                        ldy #CONFIG_L2
 
-MC_set_bin1             movb CPROG BIN1
+                        ;; Poner LEDS en MODO_CONFIG
+                        movb #$01 LEDS
 
-MC_check_bd2            brclr Banderas+1,$04,MC_jsr_tarea_teclado
+                        ;; Mandar a imprimir el MSG
+                        jsr LCD
 
-                        ldab CPROG
+                        ;; Poner en BIN1 el valor de V_LIM
+                        movb V_LIM BIN1
+
+                        ;; Verificar si V_LIM = 0
+MC_chk_v_lim            tst V_LIM
+                        bne MC_chk_ARRAY_OK
+
+                        ;; Caso donde V_LIM = 0, desplegar valor en DISP
+                        movb V_LIM BIN1            
+
+                        ;; Verificar si ARRAY_OK = 0
+MC_chk_ARRAY_OK         brclr Banderas+1,$04,MC_jsr_tarea_teclado
+
+                        ;; Caso donde ARRAY_OK != 0
+                        ;; Guardar V_LIM en pila temporalmente, para verificar
+                        ;; si el nuevo valor de V_LIM está dentro del rango
+                        ;; o no. Si no lo está, guardar este valor de nuevo
+                        ;; en V_LIM
+                        ldab V_LIM
                         pshb
 
+                        ;; Ir a BCD_BIN, y devolver valor temporal a R2
                         jsr BCD_BIN
                         pulb
 
-                        ldaa CPROG
-                        cmpa #11
-                        bhi MC_check_96
+                        ;; Verificar si V_LIM es menor que 45 km/h
+                        ldaa V_LIM
+                        cmpa #45
+                        blo MC_restore_cprog
 
-                        bra MC_restore_cprog
+                        ;; Verificar si V_LIM es mayor que 90 km/h
+MC_check_96             cmpa #90
+                        bhi MC_restore_cprog
 
-MC_check_96             cmpa #97
-                        blo MC_change_bin1
-
-                        bra MC_restore_cprog
-
-MC_change_bin1          movb CPROG BIN1
+                        ;; Caso donde V_LIM está dentro del rango aceptado
+MC_change_bin1          movb V_LIM BIN1
     	                bra MC_clear_num_array
 
-MC_restore_cprog        stab CPROG
+                        ;; Caso donde V_LIM está fuera del rango. 
+                        ;; En este caso, en R2 hay una copia del valor de
+                        ;; V_LIM antes de llamar a BIN_BCD, entonces
+                        ;; hay que restaurar esta copia
+MC_restore_cprog        stab V_LIM
 
-MC_clear_num_array      ;; borrar num_array con FF - BEGIN
+MC_clear_num_array      ;; Borrar: ARRAY_OK <- 0
                         bclr Banderas+1,$04
+
+                        ;; Borrar NUM_ARRAY con FF
                         clra
                         ldab #6             ;; limpiar Num_array
                         ldx #Num_Array
 
+                        ;; Verificar si ya se limpiaron las 6 teclas
 MC_Check_CleanFin       cba
                         beq MC_fin
 
+                        ;; Caso donde todavía R1 != R2
                         movb #$FF a,x
                         inca
 
-                        bra MC_Check_CleanFin
-                        ;; borrar num_array con FF - END                 
+                        bra MC_Check_CleanFin              
 
+                        ;; Caso donde ARRAY_OK = 0
 MC_jsr_tarea_teclado    jsr TAREA_TECLADO                                                                                                         
 
 MC_fin                  rts      
+
+;; ==================== Subrutina MODO_LIBRE =================================
+;; Descripción: Subrutina que atiende el MODO_LIBRE del programa.
+;; 
+;;  - En este modo, el RADAR muestra en el LCD el mensaje correspondiente,
+;;  y se mantiene sin realizar cálculos.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: ninguno
+;;  ESTADOS INTERNOS:
+;;      - Banderas.5: Esta bandera indica si el estado cambio. Es decir,
+;;                    esta es la primera vez que se entra a MODO_LIBRE.
+;;
+
+MODO_LIBRE              brclr Banderas+1,$20,ML_retornar
+
+                        ;; Caso en donde es la primera vez que se entra
+                        ;; en este modo
+                        ldx #MODO_LIB_L1
+                        ldy #MODO_LIB_L2
+                        
+                        ;; Poner LEDS en modo correspondiente
+                        movb #$04 LEDS
+
+                        ;; Cambiar LCD
+                        jsr LCD
+
+ML_retornar             rts                        
 
 ;; ==================== Subrutina BCD_BIN ==================================== 
 
 BCD_BIN                 ldx #Num_Array
                         clra
-                        clr CPROG
+                        clr V_LIM
 
 BCD_B_check_ff          ldab 1,x+
 
@@ -1071,47 +1359,47 @@ BCD_B_check_unit        cmpa #1
                         mul
                         ldaa 1,x+
                         mul
-                        addb CPROG
-                        stab CPROG
+                        addb V_LIM
+                        stab V_LIM
                         pula
 
                         bra BCD_B_check_unit   
 
 BCD_B_add_unit          ldab 0,x
-                        addb CPROG
-                        stab CPROG
+                        addb V_LIM
+                        stab V_LIM
 
                         rts       
 
-;; ==================== Subrutina BIN_BCD ====================================                                                                
+;; ==================== Subrutina CONV_BIN_BCD ===============================                                                                
 
-BIN_BCDx                ldaa BIN1
+CONV_BIN_BCD            ldaa BIN1
                         cmpa #99
 
-                        bhi BIN_disable_1
+                        bhi CBB_disable_1
 
                         jsr BIN_BCD
 
                         movb BCD_L BCD1
 
-                        bra BIN_check_bin2
+                        bra CBB_check_bin2
 
-BIN_disable_1           movb #$FF BCD1
+CBB_disable_1           movb #$FF BCD1
 
-BIN_check_bin2          ldaa BIN2
+CBB_check_bin2          ldaa BIN2
                         cmpa #99 
 
-                        bhi BIN_disable_2
+                        bhi CBB_disable_2
 
                         jsr BIN_BCD
 
                         movb BCD_L BCD2 
 
-                        bra BIN_fin
+                        bra CBB_fin
 
-BIN_disable_2           movb #$FF BCD2
+CBB_disable_2           movb #$FF BCD2
 
-BIN_fin                 rts                        
+CBB_fin                 rts                        
 
 ;; ==================== Subrutina BIN_BCD ====================================
 ;; Descripción: Subrutina general para convertir un número binario a BCD.
@@ -1426,7 +1714,3 @@ PT_LEDS_shift           ;; Guardar en A la parte baja de LEDS
 PT_LEDS_clr             bclr LEDS,$F8
 
 PT_LEDS_retornar        rts                                                
-
-;; ==================== Subrutina CONV_BIN_BCD ================================
-
-CONV_BIN_BCD            rts
