@@ -80,7 +80,7 @@ MAX_BRILLO:             equ 20
 ;;                      => Se manejan con Banderas,[$01,$02,$04,$08,$10,..]
 ;;                      Banderas.8 : SEND_CMD (0) or SEND_DATA (1)
 ;;                      Banderas.9 : CALC_TICKS     $02
-;;                      Banderas.10 : --            $04
+;;                      Banderas.10 : OUT_RANGE     $04
 ;;                      Banderas.11 : --            $08
 ;;                      Banderas.12 : --            $10
 ;;                      Banderas.13 : --            $20
@@ -1047,6 +1047,10 @@ MODO_MEDICION           brclr Banderas+1,$20,MM_chk_veloc
                         movb #$09,PIEH      ;; Habilitar keywakeups PH3 y PH0
                         movb #$02,LEDS      ;; Poner el modo en los LEDS
 
+                        ;; BORRAR los valores de BIN
+                        movb #$FF BIN1 ;; AQUI VA $BB
+                        movb #$FF BIN2 ;; AQUI VA $BB
+
                         ;; Cargar en el LCD los mensajes correspondientes
                         ldx #MED_L1
                         ldy #MED_ESP_L2
@@ -1113,7 +1117,7 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
                         ldaa BIN1
 
                         ;; Verificar si PANT_FLAG = 1
-                        brset Banderas,$08,PTC_chk_vel
+                        brset Banderas+1,$08,PTC_chk_vel
 
                         ;; Caso donde PANT_FLAG = 0
                         ;; Verificar si BIN1 tiene V_LIM o no ($BB)
@@ -1136,6 +1140,7 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
                         movb #$ff BIN2 ;; $BB
                         clr VELOC
                         movb #$09 PIEH
+                        bclr Banderas,$04 ;; Borrar bandera de OUT_RANGE
                         bset Banderas,$02 ;; Poner CALC_TICKS = 1
                         bclr Banderas+1,$10 ;; Ponert ALERTA = 0
 
@@ -1153,13 +1158,25 @@ PTC_chk_vel             ;; Caso donde PANT_FLAG = 1
                         ;; Actualizar mensaje
                         ldx #MED_L1
                         ldy #MED_VEL_L2
-                        jsr LCD 
+                        jsr LCD
 
+                        ;; Verificar si OUT_RANGE = 1
+                        brset Banderas,$04,PTC_guiones
+
+                        ;; Caso donde OUT_RANGE = 0, velocidad dentro del rango 
                         ;; Poner V_LIM y VELOC en 7 segmentos
                         movb V_LIM BIN1
                         movb VELOC BIN2
 
 PTC_local_return        bra PTC_retornar
+
+                        ;; Caso donde OUT_RANGE = 1, velocidad está fuera del
+                        ;; rango
+                        ;; Poner V_LIM y '--' en 7 segmentos
+PTC_guiones             movb V_LIM BIN1
+                        movb #$FF BIN2  ;; Aqui va $AA
+
+                        bra PTC_retornar
 
 PTC_calc                ;; Caso donde CALC_TICS = 1, no se han hecho calculos
                         ;; Verificar si CALC < 30
@@ -1182,25 +1199,22 @@ PTC_calc                ;; Caso donde CALC_TICS = 1, no se han hecho calculos
                         ;; de TICK_EN, y de TICK_DIS
 PTC_calculate           ldaa VELOC
                         tfr a,x
-                        ldd #360        ;; Constante para 100m
+                        ldd #16480        ;; Constante para 100m
                         idiv
                         stx TICK_EN
 
                         ldaa VELOC
                         tfr a,x
-                        ldd #720        ;; Constante para 200m
+                        ldd #32959        ;; Constante para 200m
                         idiv
-                        stx TICK_EN
+                        stx TICK_DIS
 
                         bra PTC_calc_finish
 
                         ;; Caso donde VELOC tiene una velocidad inválida
-PTC_invalid_vel         movw #1 TICK_EN     ;; Cargar 1 en TICK_EN 
-                        movw #92 TICK_DIS   ;; Suficiente para que dure 2 seg
-
-                        ;; Cargar velocidad límite, y '--' en velocidad
-                        movb V_LIM BIN1
-                        movb #$FF BIN2              ;; Aqui va $AA      
+PTC_invalid_vel         bset Banderas,$04   ;; Cargar 1 en OUT_RANGE
+                        movw #1 TICK_EN     ;; Cargar 1 en TICK_EN 
+                        movw #92 TICK_DIS   ;; Suficiente para que dure 2 seg        
 
 PTC_calc_finish         bclr Banderas,$02   ;; Borrar bandera de CALC_TICKS   
 
