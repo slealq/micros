@@ -122,8 +122,6 @@ Tecla_in:               ds 1
 Cont_reb:               ds 1
 Cont_TCL:               ds 1
 Patron:                 ds 1
-Cuenta:                 ds 1
-Acumul:                 ds 1
 VMAX:                   db 250
 TIMER_CUENTA:           ds 1
 LEDS:                   db 1
@@ -218,7 +216,6 @@ MN_wait_10us            dbne b,MN_wait_10us
 
 MN_After_10us           movb #$30 ATD0CTL3
                         movb #$BF ATD0CTL4
-                        movb #$87 ATD0CTL5
 
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
@@ -235,80 +232,66 @@ MN_After_10us           movb #$30 ATD0CTL3
                         bset CRGINT $80     ;; RTI enable
 
                         ;; para DDRK -> LCD
-                        movb #$FF DDRK 
+                        movb #$FF DDRK             
 
-                        cli                 ;; I = 0
-
-                        ldd TCNT            ;; Primer oc
-                        addd #14
-                        std TC4                   
-
-                        ;; habilitar puerto b como salidas
+                        ;; Configuración de LEDS
+                        ;; habilitar puerto b como salidas -> LEDS
                         movb #$FF DDRB
-
                         ;; habilitar puerto j (tierra de leds)     
                         bset DDRJ,$02
-
-                        ;; habilitar rele de microcontrolador
-                        bset DDRE,$04
-
                         ;; habilitar puerto p (tierras de disp)
                         movb #$0F DDRP
 
                         ;; habilitar H como entrada, flanco decreciente en 0,3
+                        ;; Botones de PH
                         clr DDRH
                         movb #$F6 PPSH
                         movb #$FF PIFH
+                        clr PIEH        ;; Deshabilitar interrupciones                        
+
+                        ;; Habilitar interrupciones, y realizar primer
+                        ;; calculo para OC4 y ATD
+                        cli                 ;; I = 0
+
+                        ldd TCNT            ;; Primer oc
+                        addd #60
+                        std TC4                               
 
 ;; ===========================================================================
 ;; ==================== INICIALIZACIÓN DE VARIABLES ==========================
 ;; ===========================================================================
 
+                        ;; Limpiar contadores de OC4
                         clr CONT_DIG
                         clr CONT_TICKS
                         movw #5000 CONT_7SEG
+                        movw #10000 CONT_200
 
+                        ;; Limpiar V_LIM y VELOC
                         clr V_LIM
-                        clr Acumul
-                        clr Cuenta
+                        clr VELOC                        
 
-                        clr Banderas
-                        clr Banderas+1
+                        ;; Limpiar TODAS las banderas... Luego se 
+                        ;; configuran las que son necesarias
+                        ldx #0
+                        stx Banderas
 
+                        ;; Limpiar variables para el teclado matricial
                         movb #$FF Tecla
                         movb #$FF Tecla_in
                         clr Cont_TCL
                         movb #10 Cont_reb
 
-                        ;; inicialización nueva
-                        bclr Banderas,$C0 ;; limpiar bit 7 y 6
-                        clr PIEH
-
-                        ;; imprimir mensaje de config primera vez
+                        ;; Imprimir mensaje de config primera vez
                         ldx #CONFIG_L1
                         ldy #CONFIG_L2
                         jsr LCD
 
-                        ;; set leds en config
-                        movb #$01,LEDS
-
-                        ;; limpiar banderas de:
-                        bclr Banderas,$80 ;; PH3_FIRED
-                        bset Banderas,$02 ;; CALC_TICKS
-                        bclr Banderas+1,$10 ;; ALERTA
-                        bclr Banderas+1,$08 ;; PANT_FLAG
-                        bclr Banderas+1,$20 ;; STATE_CHANGED
-
-                        ;; limpiar posibles calculos
-                        clr VELOC
+                        ;; Limpiar todos los LEDS
                         movb #$BB,BIN1
                         movb #$BB,BIN2
-
-                        ;; limpiar limite de velocidad
-                        clr V_LIM
-
-                        ;; limpiar bandera de ARRAY_OK
-                        bclr Banderas+1,$04
+                        ;; set leds en config
+                        movb #$01,LEDS
 
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
@@ -1055,6 +1038,9 @@ MODO_MEDICION           brclr Banderas+1,$20,MM_chk_veloc
                         ldx #MED_L1
                         ldy #MED_ESP_L2
                         jsr LCD
+
+                        ;; Cargar CALC_TICKS en 1
+                        bset Banderas,$02
 
                         ;; Verificar si VELOC = 0
 MM_chk_veloc            tst VELOC
