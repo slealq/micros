@@ -148,7 +148,7 @@ Num_Array:              ds 6
 
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 
-SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$00,$40
+SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$40,$00
 
 iniDISP:                db $04,$28,$28,$06,$0C
 
@@ -301,8 +301,8 @@ MN_After_10us           movb #$30 ATD0CTL3
 
                         ;; limpiar posibles calculos
                         clr VELOC
-                        movb #$ff,BIN1  ;; $BB
-                        movb #$ff,BIN2  ;; $BB
+                        movb #$BB,BIN1
+                        movb #$BB,BIN2
 
                         ;; limpiar limite de velocidad
                         clr V_LIM
@@ -360,8 +360,8 @@ MN2_chk_med_mode        ;; Caso donde V_LIM != 0
                         clr PIEH
 
                         clr VELOC
-                        movb #$ff,BIN1 ;; $BB 
-                        movb #$ff,BIN2 ;; $BB 
+                        movb #$BB,BIN1
+                        movb #$BB,BIN2
 
                         bclr Banderas,$80 ;; PH3_FIRED
                         bset Banderas,$02 ;; CALC_TICKS
@@ -1048,8 +1048,8 @@ MODO_MEDICION           brclr Banderas+1,$20,MM_chk_veloc
                         movb #$02,LEDS      ;; Poner el modo en los LEDS
 
                         ;; BORRAR los valores de BIN
-                        movb #$FF BIN1 ;; AQUI VA $BB
-                        movb #$FF BIN2 ;; AQUI VA $BB
+                        movb #$BB BIN1
+                        movb #$BB BIN2
 
                         ;; Cargar en el LCD los mensajes correspondientes
                         ldx #MED_L1
@@ -1121,7 +1121,7 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
 
                         ;; Caso donde PANT_FLAG = 0
                         ;; Verificar si BIN1 tiene V_LIM o no ($BB)
-                        cmpa #$ff
+                        cmpa #$BB
                         beq PTC_local_return
 
                         ;; Caso donde R1 != $BB, PANT_FLAG = 0
@@ -1136,8 +1136,8 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
                         jsr LCD
 
                         ;; Reiniciar variables
-                        movb #$ff BIN1 ;; $BB
-                        movb #$ff BIN2 ;; $BB
+                        movb #$BB BIN1
+                        movb #$BB BIN2
                         clr VELOC
                         movb #$09 PIEH
                         bclr Banderas,$04 ;; Borrar bandera de OUT_RANGE
@@ -1148,7 +1148,7 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
 
 PTC_chk_vel             ;; Caso donde PANT_FLAG = 1
                         ;; Verificar si BIN1 tiene V_LIM o no ($BB)
-                        cmpa #$ff ;; $BB 
+                        cmpa #$BB
                         bne PTC_retornar
 
                         ;; Caso donde R1 = $BB, PANT_FLAG = 1
@@ -1174,7 +1174,7 @@ PTC_local_return        bra PTC_retornar
                         ;; rango
                         ;; Poner V_LIM y '--' en 7 segmentos
 PTC_guiones             movb V_LIM BIN1
-                        movb #$FF BIN2  ;; Aqui va $AA
+                        movb #$AA BIN2
 
                         bra PTC_retornar
 
@@ -1396,32 +1396,76 @@ BCD_B_add_unit          ldab 0,x
                         rts       
 
 ;; ==================== Subrutina CONV_BIN_BCD ===============================                                                                
+;; Descripción: Subrutina utilizada para convertir dos números binarios
+;;              a dos números en BCD.
+;; 
+;;  - Esta subrutina utiliza la subrutina BIN_BCD para convertir dos veces
+;;  dos números binarios diferentes a BCD. Estos dos números son: BIN1 y BIN2
+;;  y son guardados en BCD como BCD1 y BCD2.
+;;
+;;  - Hay dos casos especiales. Cuando la subrutina encuentra que hay un
+;;  $AA o un $BB en alguna de las dos subrutinas, entonces guardará
+;;  exactamente el mismo valor en la variable de BCD correspondiente.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - BIN1:     Primer número binario que se desea cambiar a un número
+;;                  en BCD. El resultado será guardado en BCD1.
+;;      - BIN2:     Segundo número binario que se desea cambiar a un número
+;;                  en BCD. El resultado será guardado en BCD2.
+;;  PARAMETROS DE SALIDA:
+;;      - BCD1:     Posición en memoria donde se guarda el resultado para el
+;;                  primer número en BCD.
+;;      - BCD2:     Posición en memoria donde se guarda el resultado para el
+;;                  segundo número en BCD.        
+;; 
 
+                        ;; Verificar si BIN1 = $BB
 CONV_BIN_BCD            ldaa BIN1
-                        cmpa #99
+                        cmpa #$BB
+                        bne CBB_cmp_1_a
 
-                        bhi CBB_disable_1
-
-                        jsr BIN_BCD
-
-                        movb BCD_L BCD1
+                        ;; Caso donde BIN1 = $BB
+                        movb #$BB BCD1
 
                         bra CBB_check_bin2
 
-CBB_disable_1           movb #$FF BCD1
+                        ;; Caso donde BIN1 != $BB
+                        ;; Verificar si BIN1 = $AA
+CBB_cmp_1_a             cmpa #$AA
+                        bne CBB_ld_bin_bcd1
 
-CBB_check_bin2          ldaa BIN2
-                        cmpa #99 
+                        ;; Caso donde BIN1 = $AA
+                        movb #$AA BCD1 
 
-                        bhi CBB_disable_2
+                        bra CBB_check_bin2
 
-                        jsr BIN_BCD
+CBB_ld_bin_bcd1         ;; Caso donde BIN1 != $AA               
+                        jsr BIN_BCD     ;; Recibe por A el valor binario
+                        movb BCD_L BCD1
 
-                        movb BCD_L BCD2 
+CBB_check_bin2          ;; Verificar sin BIN2 = $BB
+                        ldaa BIN2
+                        cmpa #$BB
+                        bne CBB_cmp_2_a
+
+                        ;; Caso donde BIN2 = $BB
+                        movb #$BB BCD2
 
                         bra CBB_fin
 
-CBB_disable_2           movb #$FF BCD2
+                        ;; Caso donde BIN2 != $BB
+                        ;; Verificar si BIN2 = $AA
+CBB_cmp_2_a             cmpa #$AA
+                        bne CBB_ld_bin_bcd2
+
+                        ;; Caso donde BIN2 = $AA
+                        movb #$AA BCD2
+
+                        bra CBB_fin
+
+CBB_ld_bin_bcd2         ;; Caso donde BIN2 != $AA               
+                        jsr BIN_BCD     ;; Recibe por A el valor binario
+                        movb BCD_L BCD2           
 
 CBB_fin                 rts                        
 
@@ -1490,65 +1534,59 @@ BBCD_return             lsla
                         rts                                                                                            
 
 ;; ==================== Subrutina BCD_7SEG ===================================
+;; Descripción: Subrutina encargada actualizar los valores de DISPx.
+;; 
+;;  - Esta subrutina, se encarga de tomar los valores que se encuentran en
+;;  en BCD1 y BCD2 y separarlos en dos (nibble superior e inferior). La 
+;;  subrutina utiliza el valor de los nibbles como offset en la tabla SEGMENT 
+;;  para encontrar el byte que genera el patron correspondiente para cada DISP.
+;;
+;;  - El resultado se guarda en DISP1 y DISP2 correspondientemente para el 
+;;  BCD1, y en DISP3 y DISP4 correspondientemente para el BCD2.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - BCD1:     Posición en memoria donde se guarda el resultado para el
+;;                  primer número en BCD.
+;;      - BCD2:     Posición en memoria donde se guarda el resultado para el
+;;                  segundo número en BCD.        
+;;  PARAMETROS DE SALIDA:
+;;      - DISP1:    Display correspondiente al nibble superior de BCD2.
+;;      - DISP2:    Display correspondiente al nibble inferior de BCD2.
+;;      - DISP3:    Display correspondiente al nibble superior de BCD1.
+;;      - DISP4:    Display correspondiente al nibble inferior de BCD1.
+;;
 
+                        ;; Cargar en R1 el valor de BCD2
+                        ;; Cargar en X posición de tabla SEGMENT
 BCD_7SEG                ldaa BCD2
                         ldx #SEGMENT
 
-                        cmpa #$FF
-                        beq BCD_7s_clr_bcd2
-
+                        ;; Procesar nibble inferior
                         anda #$0F
                         movb a,x DISP2
 
+                        ;; Procesar nibble superior
                         ldaa BCD2
                         lsra 
                         lsra
                         lsra
                         lsra
-                        
-                        cmpa #0
-                        beq BCD_save_ff_disp1
-
                         movb a,x DISP1
 
-                        bra BCD_7s_put_bcd2
+                        ;; Cargar en R1 el valor de BCD1
+                        ldaa BCD1
 
-BCD_save_ff_disp1       movb #00 DISP1
-
-                        bra BCD_7s_put_bcd2
-
-BCD_7s_clr_bcd2         movb #$00 DISP2
-                        movb #$00 DISP1                        
-
-BCD_7s_put_bcd2         ldaa BCD1
-
-                        cmpa #$FF
-                        beq BCD_7s_clr_bcd1
-
+                        ;; Procesar nibble inferior
                         anda #$0F
-                        ldx #SEGMENT
-
                         movb a,x DISP4
 
+                        ;; Procesar nibble superior
                         ldaa BCD1
                         lsra
                         lsra
                         lsra
                         lsra
-                        
-                        cmpa #0
-                        beq BCD_save_ff_disp2
-
                         movb a,x DISP3
-
-                        bra BCD_7s_return
-
-BCD_save_ff_disp2       movb #00 DISP3     
-
-                        bra BCD_7s_return
-
-BCD_7s_clr_bcd1         movb #$00 DISP4
-                        movb #$00 DISP3                        
 
 BCD_7s_return           rts
 
