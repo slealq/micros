@@ -81,6 +81,9 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         org $3E64
                         dw OC5_ISR
 
+                        org $3E40
+                        dw IIC_ISR
+
 ;; ===========================================================================
 ;; ==================== RUTINA DE INICIALIZACIÓN =============================
 ;; ===========================================================================
@@ -89,6 +92,9 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         lds #$3bff                        
 
                         ;; Configuración de I^2C
+                        movb #$23,IBFD          
+                        bset IBEN,#$80
+                        bset IBEN,#$40              
 
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
@@ -160,11 +166,44 @@ MAIN                    bra *
 ;; ==================== SUBRUTINAS DE INTERRUPCIONES =========================
 ;; ===========================================================================
 
+;; ==================== Subrutina IIC_ISR ====================================
+
+                        ;; Borrar bandera de interrupción
+IIC_ISR                 bset IBSR,$01
+
+                        ;; Verificar si bandera de RW_RTC está en 0
+                        brclr Banderas,$80,IIC_write_isr
+
+                        ;; Bandera en 1, lo que significa lectura
+                        jsr READ_RTC
+
+                        bra IIC_retornar
+
+                        ;; Bandera en 0, lo que significa escritura
+IIC_write_isr           jsr WRITE_RTC                                                
+
+IIC_retornar            rti
 
 ;; ==================== Subrutina RTI_ISR ====================================
 ;; Descripción: Realiza la lectura del RTC cada segundo.
 
 RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
+
+                        tst Cont_Delay
+                        beq RTI_set_and_return
+
+                        ;; No, decrementar y regresar
+                        dec Cont_Delay
+                        bra RTI_retornar
+
+RTI_set_and_return      ;; Cargar valor para un segundo
+                        movb #255 Cont_Delay
+
+                        bset Banderas,$80
+                        jsr CALL_DS1307
+
+                        ;; Leer los datos y guardarlos en BCD1 y BCD2
+                        ;; con MM en BCD1 y HH en BCD2
 
 RTI_retornar            rti
 
@@ -332,6 +371,84 @@ CD_prepare_wr           movb DIR_WR,IBDR
 CD_return               bset IBEN,$20 ;; IBEN.5 = 1
 
                         rts
+
+;; ==================== Subrutina READ_RTC ===================================                        
+
+                        ;; Verificar si es la primera vez que se entra
+                        ;; en esta subrutina, después de un llamado
+READ_RTC                ldaa Index_RTC
+                        cmpa #0
+                        beq RR_word_address
+
+                        ;; Caso en que no es la primera vez
+                        ;; Verificar si es la segunda vez
+                        cmpa #1
+                        beq RR_Started_repeat
+
+                        ;; Caso en que no es la segunda
+                        ;; Verificar si es la tercera vez
+                        cmpa #2
+                        beq RR_Invert_txrx
+
+                        ;; Caso en que no es la tercera
+                        ;; Verificar si es la última
+                        cmpa #9
+                        beq RR_restore_settings
+
+                        ;; Caso en que no es la última
+                        ;; Verificar si es la penultima
+                        cmpa #8
+                        beq RR_prepare_stop
+                        
+                        ;; En caso de que no, ir a get_data
+                        bra RR_get_data
+
+                        ;; Caso donde es la primera int
+RR_word_address         clr IBDR            ;; Mandar ADD de segundos
+
+                        bra RR_inc_index
+
+                        ;; Caso en donde es la segunda int
+RR_Started_repeat       bset IBEN,$04       ;; Poner repeated started
+                        movb DIR_RD IBDR    ;; Calling Address de READ
+
+                        bra RR_inc_index
+
+                        ;; Caso en donde es la tercer int
+RR_Invert_txrx          bclr IBEN,$04       ;; Apagar repeated started
+                        bclr IBEN,$10       ;; Master en recepeción
+                        bclr IBEN,$08       ;; Enviar ACK en bit 9
+
+                        ldaa IBDR           ;; Iniciar lectura dummy
+
+                        bra RR_inc_index
+
+                        ;; Caso en que es la última int
+RR_restore_settings     bclr IBEN,$08       ;; Habilitar ACK en TX * REVISAR
+                        bset IBEN,$10       ;; Master en Transmisión
+                        clr Index_RTC
+                        bclr IBEN,$20       ;; Mandar STOP
+
+                        bra RR_retornar
+
+                        ;; Caso en que la transmisión es antepenultima
+                        bset IBEN,$08       ;; NO Enviar ACK en bit 9
+
+                        ;; Guardar los datos
+RR_get_data             suba #3
+                        ldx T_Read_RTC
+
+                        ;; Inicia nueva secuencia
+                        movb IBDR a,x         
+
+RR_inc_index            inc Index_RTC
+
+RR_retornar             rts
+                        
+
+;; ==================== Subrutina WRITE_RTC ==================================                        
+
+WRITE_RTC               rts
 
 ;; ==================== Subrutina BCD_7SEG ===================================
 ;; Descripción: Subrutina encargada actualizar los valores de DISPx.
