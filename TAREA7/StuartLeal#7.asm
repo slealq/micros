@@ -505,6 +505,18 @@ BCD_7SEG                ldaa BCD2
                         lsra
                         movb a,x DISP3
 
+                        ;; Agregar lógica para segundos
+                        ldd T_Read_RTC
+                        andb #$01
+
+                        ;; Verificar si segundos = 0
+                        cmpb #0
+                        beq BCD_7s_return
+
+                        ;; Caso donde segundos = 1, activar :
+                        bset DISP3,$80
+                        bset DISP2,$80
+
 BCD_7s_return           rts
 
 ;; ==================== Subrutina DELAY ====================================== 
