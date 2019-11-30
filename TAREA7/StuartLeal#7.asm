@@ -160,6 +160,9 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         movb #$BB BCD1
                         movb #$BB BCD2
                         clr LEDS
+                        movb #40 BRILLO
+
+                        ;; Borrar el indice de RTC
                         clr Index_RTC
 
                         ;;  Cargar en LCD el mensaje de Reloj 623
