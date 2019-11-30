@@ -167,6 +167,10 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         ldy #RELOJ_L2
                         jsr LCD
 
+                        ;; Definir
+                        bclr Banderas,$80   ;; Configurar RW_RTC = 0
+                        bset Banderas,     $40   ;; ALARM_FIRST = 1 
+
                         ;; ELIMINAR - Configurar CLK una vez para pruebas
                         ;; Deshabilitar Fuente de Call_DS1307 mientras
                         ;; se completa la transmisión
@@ -186,7 +190,29 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
 
-MAIN                    bra *
+MAIN                    ldx BCD1    ;; Esto trae a BCD2 también que seguido
+
+                        cpx ALARMA
+                        beq MAIN_set_alarm
+
+                        bset Banderas,$40   ;; Volver a dejar ALARM_FIRST = 1
+
+                        bra MAIN
+
+                        ;; Si ALARM_FIRST = 0, entonces ya se encendio la alarma
+MAIN_set_alarm          brclr Banderas,$40,MAIN     
+
+                        bset TIE,$20
+                        bset TIOS,$20
+                        bclr Banderas,$40   ;; Poner ALARM_FIRST = 0
+
+                        ;; Configurar primera interrupción de OC5
+                        ldd TCNT
+                        addd #100
+                        std TC5
+
+                        bra MAIN
+
 
 ;; ===========================================================================
 ;; ==================== SUBRUTINAS DE INTERRUPCIONES =========================
@@ -416,8 +442,57 @@ OC5_retornar            rti
 
 ;; ==================== Subrutina PH_ISR =====================================
 
-PH_ISR                  movb #$0F PIFH
-                        rti
+                        ;; Verificar si la interrupción es por PH0
+PH_ISR                  brset PIFH,$01,PH_call_write
+
+                        ;; Verificar si la interrupción es por PH1
+                        brset PIFH,$02,PH_clr_alarm
+
+                        ;; Verificar si la interrupción es por PH2
+                        brset PIFH,$04,PH_dec_brightness
+
+                        ;; Si no, la interrupción tiene que ser por PH3'
+                        ldaa BRILLO
+                        cmpa #100
+                        beq PH_clr_ph3
+
+                        ;; Caso en que no hay llegado al limite, incrementar
+                        adda #5
+                        staa BRILLO
+
+                        ;; Resetear interrupción PH3
+PH_clr_ph3              bset PIFH,$08
+
+                        bra PH_retornar
+
+PH_call_write           ;; Caso en que es el Ph0      
+                        bclr Banderas,$80       ;; Limpiar RW_RTC
+                        jsr CALL_DS1307
+                        bset PIFH,$01
+
+                        bra PH_retornar
+
+                        ;; Caso en que es el Ph1
+PH_clr_alarm            bclr TIE,$20
+                        bclr TIOS,$20
+
+                        bset PIFH,$02
+
+                        bra PH_retornar
+
+                        ;; Caso en que es el PH2
+PH_dec_brightness       tst BRILLO
+                        beq PH_clr_ph2
+
+                        ;; Decrementar brillo
+                        ldaa BRILLO
+                        suba #5
+                        staa BRILLO
+
+PH_clr_ph2              ;; Resetear interrupción PH2
+                        bset PIFH,$04                               
+
+PH_retornar             rti
 
 ;; ===========================================================================
 ;; ==================== SUBRUTINAS GENERALES =================================
