@@ -35,13 +35,13 @@ CONT_TICKS:             ds 1
 DT:                     ds 1
 BCD1:                   ds 1
 BCD2:                   ds 1
-DISP1:                  db 1
-DISP2:                  db 1
-DISP3:                  db 1
-DISP4:                  db 1
-LEDS:                   db 1
+DISP1:                  ds 1
+DISP2:                  ds 1
+DISP3:                  ds 1
+DISP4:                  ds 1
+LEDS:                   ds 1
 SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$40,$00
-CONT_7SEG:              dw 1    
+CONT_7SEG:              ds 2    
 Cont_Delay:             ds 1
 Cont_Buzzer:            ds 1    ;; Estructura de datos adicional
 D2ms:                   db 100
@@ -596,33 +596,34 @@ WRITE_RTC               ldaa Index_RTC
                         cmpa #0
                         beq WR_send_add
 
-                        ;; Verificar si era la última interrupción
+                        ;; Verificar si es la última interrupción
                         cmpa #8
-                        beq WR_last_int
+                        beq WR_clr_index
 
                         ;; Caso en donde NO es la primera interrupción
                         ;; Ni tampoco la última
                         ;; Enviar info desde el master al RTC
                         ldx #T_Write_RTC
-                        suba #1
-                        movb a,x IBDR
+                        ldab Index_RTC
+                        subb #1
+                        movb b,x IBDR
 
                         ;; Verificar si era la penúltima interrupcón
                         cmpa #7
                         beq WR_stopbit_int
 
-                        ;; Caso en que no era la última interrupción
+                        ;; Caso en que no era la penúltima interrupción
                         bra WR_inc_and_return
 
-WR_stopbit_int          ;; Caso en que era la última interrupción
+WR_stopbit_int          ;; Caso en que era la penúltima interrupción
                         bclr IBCR,$20   ;; Transición 1->0 STOP SIGNAL
 
                         bra WR_inc_and_return
-                        
-WR_last_int             ;; Caso en que era la última interrupción
+
+WR_clr_index            ;; Caso en que era la última interrupción
                         clr Index_RTC
-                        bset CRGINT,$80
                         bset PIEH,$01
+                        bset CRGINT,$80
 
                         bra WR_retornar
 
