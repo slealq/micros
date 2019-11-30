@@ -159,6 +159,7 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         ;; Limpiar BCD para que esté apagado al puro inicio
                         movb #$BB BCD1
                         movb #$BB BCD2
+                        clr LEDS
                         clr Index_RTC
 
                         ;;  Cargar en LCD el mensaje de Reloj 623
@@ -176,6 +177,10 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         jsr CALL_DS1307
                         ;; Habilitar RTI
                         ;;bset CRGINT,$80
+
+                        ;; Probar OC5
+                        bset TIE,$20
+                        bset TIOS,$20
 
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
@@ -220,17 +225,19 @@ RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 RTI_set_and_return      ;; Cargar valor para un segundo
                         movb #255 CONT_RTI ;; De momento estoy con 255 ms
 
-
-                        ;; Deshabilitar Fuente de Call_DS1307 mientras
-                        ;; se completa la transmisión
-                        bclr PIEH,$01
-                        bclr CRGINT,$80
                         ;; Definir la bandera de RW_RTC
                         bset Banderas,$80
                         jsr CALL_DS1307
 
                         ;; Leer los datos y guardarlos en BCD1 y BCD2
                         ;; con MM en BCD1 y HH en BCD2
+                        ldx #T_Read_RTC
+                        ldaa #1
+                        movb a,x BCD1
+                        ldaa #2
+                        movb a,x BCD2
+                        bclr BCD2,$40   ;; Elimiar el 12/24 bit de la hora
+                        bclr BCD2,$20   ;; Elimiar el AM/PM bit de la hora
 
 RTI_retornar            rti
 
@@ -378,7 +385,34 @@ OC5_ISR                 ldd TCNT
                         addd #100
                         std TC5
 
-                        rti
+                        ;; Verficar si Cont_Buzzer = 3
+                        ldaa Cont_Buzzer
+                        cmpa #3
+                        beq OC5_prepare_set
+
+                        ;; Caso donde Cont_Buzzer no es igual a 3
+                        ;; Verificar si Cont_Buzzer = 1
+                        cmpa #1
+                        beq OC5_prepare_noset
+
+                        ;; Ir a incrementer Buzzer
+                        bra OC5_inc_buzzer
+
+OC5_prepare_set         ;; Caso donde Cont_Buzzer = 3
+                        bset TCTL1,$08  ;; TCTL1.3
+                        bset TCTL1,$04  ;; TCTL1.2
+                        clr Cont_Buzzer
+
+                        bra OC5_retornar
+
+                        ;; Caso donde Cont_Buzzer = 1
+OC5_prepare_noset       bset TCTL1,$08  ;; TCTL1.3
+                        bclr TCTL1,$04  ;; TCTL1.2
+
+                        ;; Caso donde no es ninguna de las anteriores
+OC5_inc_buzzer          inc Cont_Buzzer
+
+OC5_retornar            rti
 
 ;; ==================== Subrutina PH_ISR =====================================
 
@@ -391,7 +425,13 @@ PH_ISR                  movb #$0F PIFH
 
 ;; ==================== CALL_DS1307 ==========================================
 
-CALL_DS1307             bset IBCR,$10 ;; MODO TX
+CALL_DS1307             ;; Deshabilitar Fuente de Call_DS1307 mientras
+                        ;; se completa la transmisión
+                        bclr PIEH,$01
+                        bclr CRGINT,$80
+
+                        ;; Configuración para enviar calling address
+                        bset IBCR,$10 ;; MODO TX
                         bset IBCR,$20 ;; IBCR.5 = 1, START BIT
 
 CD_prepare_wr           movb DIR_WR,IBDR
@@ -576,11 +616,11 @@ BCD_7SEG                ldaa BCD2
                         movb a,x DISP3
 
                         ;; Agregar lógica para segundos
-                        ldd T_Read_RTC
-                        andb #$01
+                        ldaa T_Read_RTC     ;; Cargar segundos, primera pos
+                        anda #$01
 
                         ;; Verificar si segundos = 0
-                        cmpb #0
+                        cmpa #0
                         beq BCD_7s_return
 
                         ;; Caso donde segundos = 1, activar :
