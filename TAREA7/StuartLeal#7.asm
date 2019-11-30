@@ -116,7 +116,7 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         bset PUCR,$01       ;; Pull-up en PORTA
 
                         ;; para RTI
-                        movb #$40 RTICTL    ;; t = 1.024 ms
+                        movb #$75 RTICTL    ;; t = 1.024 ms
                         ;;bset CRGINT $80     ;; RTI enable
                         bclr CRGINT,$80
 
@@ -185,10 +185,6 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         ;; Habilitar RTI
                         ;;bset CRGINT,$80
 
-                        ;; Probar OC5
-                        bset TIE,$20
-                        bset TIOS,$20
-
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
@@ -252,7 +248,7 @@ RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
                         bra RTI_retornar
 
 RTI_set_and_return      ;; Cargar valor para un segundo
-                        movb #255 CONT_RTI ;; De momento estoy con 255 ms
+                        movb #20 CONT_RTI ;; 20 * 50ms = 1seg
 
                         ;; Definir la bandera de RW_RTC
                         bset Banderas,$80
