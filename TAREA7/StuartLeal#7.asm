@@ -60,8 +60,8 @@ T_Write_RTC:            db $00  ;; 0 segundos, activar CH=0
                         db %01001000 ;; 8 AM horas, 12 hour format
                         db $03  ;; Día número 3 (Miércoles) L:1, K:2, M:3
                         db $04  ;; Día número 4 del mes
-                        db $11  ;; Mes número 11
-                        db $13  ;; Año 19.
+                        db $12  ;; Mes número 12
+                        db $19  ;; Año 19.
 
     ;; Cambiar por valores a escribir
 T_Read_RTC:             ds 7
@@ -211,7 +211,6 @@ MAIN_set_alarm          brclr Banderas,$40,MAIN
                         std TC5
 
                         bra MAIN
-
 
 ;; ===========================================================================
 ;; ==================== SUBRUTINAS DE INTERRUPCIONES =========================
@@ -508,7 +507,7 @@ CALL_DS1307             ;; Deshabilitar Fuente de Call_DS1307 mientras
                         bset IBCR,$10 ;; MODO TX
                         bset IBCR,$20 ;; IBCR.5 = 1, START BIT
 
-CD_prepare_wr           movb DIR_WR,IBDR
+                        movb DIR_WR,IBDR
 
 CD_return               rts
 
@@ -598,7 +597,7 @@ WRITE_RTC               ldaa Index_RTC
 
                         ;; Verificar si es la última interrupción
                         cmpa #8
-                        beq WR_clr_index
+                        beq WR_last_int
 
                         ;; Caso en donde NO es la primera interrupción
                         ;; Ni tampoco la última
@@ -616,12 +615,11 @@ WRITE_RTC               ldaa Index_RTC
                         bra WR_inc_and_return
 
 WR_stopbit_int          ;; Caso en que era la penúltima interrupción
-                        bclr IBCR,$20   ;; Transición 1->0 STOP SIGNAL
+                        ;;bclr IBCR,$20   ;; Transición 1->0 STOP SIGNAL
 
                         bra WR_inc_and_return
 
-WR_clr_index            ;; Caso en que era la última interrupción
-                        clr Index_RTC
+WR_last_int             clr Index_RTC
                         bset PIEH,$01
                         bset CRGINT,$80
 
