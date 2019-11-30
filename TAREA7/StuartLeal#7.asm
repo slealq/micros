@@ -20,9 +20,9 @@ MAX_BRILLO:             equ 100
 
                         org $1000
 CONT_RTI                ds 1
-;;                      Banderas.0 : TCL_LISTA       $01
-;;                      Banderas.1 : TCL_LEIDA       $02
-;;                      Banderas.2 : ARRAY_OK        $04
+;;                      Banderas.0 : --              $01
+;;                      Banderas.1 : --              $02
+;;                      Banderas.2 : --              $04
 ;;                      Banderas.3 : --              $08
 ;;                      Banderas.4 : --              $10
 ;;                      Banderas.5 : SEND CMD | DATA $20
@@ -43,6 +43,7 @@ LEDS:                   db 1
 SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$40,$00
 CONT_7SEG:              dw 1    
 Cont_Delay:             ds 1
+Cont_Buzzer:            ds 1    ;; Estructura de datos adicional
 D2ms:                   db 100
 D260us:                 db 13
 D40us:                  db 2
@@ -54,8 +55,16 @@ Index_RTC:              ds 1
 DIR_WR:                 db $D0
 DIR_RD:                 db $D1
 ALARMA:                 dw $0108
-T_Write_RTC:            ds 6    ;; Cambiar por valores a escribir
-T_Read_RTC:             ds 6
+T_Write_RTC:            db $00  ;; 0 segundos, activar CH=0
+                        db $00  ;; 0 minutos
+                        db %01001000 ;; 8 AM horas, 12 hour format
+                        db $03  ;; Día número 3 (Miércoles) L:1, K:2, M:3
+                        db $04  ;; Día número 4 del mes
+                        db $11  ;; Mes número 11
+                        db $13  ;; Año 19.
+
+    ;; Cambiar por valores a escribir
+T_Read_RTC:             ds 7
 
 iniMensajes:
 ;;                      Mensajes de configuración
@@ -92,15 +101,15 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         lds #$3bff                        
 
                         ;; Configuración de I^2C
-                        movb #$23,IBFD          
-                        bset IBEN,#$80
-                        bset IBEN,#$40              
+                        movb #$1f,IBFD      
+                        movb #%11010000,IBCR
+                        bset IBSR,$80
 
                         ;; para OC4
                         movb #$90 TSCR1     ;; Habilitar TEN y FFCA
                         movb #$03 TSCR2     ;; Habilitar PRS = 8
-                        movb #$20 TIOS      ;; Habiliar OC 4 y OC5
-                        movb #$10 TIE       ;; Empezar OC4 ON, OC5 OFF
+                        movb #$10 TIOS      ;; Habiliar OC 4
+                        movb #$10 TIE       ;; Empezar OC4 ON
 
                         ;; para teclado matricial                        
                         movb #$F0 DDRA      ;; 4msb como entradas de PORTA
@@ -108,7 +117,8 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
 
                         ;; para RTI
                         movb #$40 RTICTL    ;; t = 1.024 ms
-                        bset CRGINT $80     ;; RTI enable
+                        ;;bset CRGINT $80     ;; RTI enable
+                        bclr CRGINT,$80
 
                         ;; Configuración de LEDS
                         ;; habilitar puerto b como salidas -> LEDS
@@ -156,6 +166,17 @@ RELOJ_L2:               fcc ' DESPERTADOR 623'
                         ldy #RELOJ_L2
                         jsr LCD
 
+                        ;; ELIMINAR - Configurar CLK una vez para pruebas
+                        ;; Deshabilitar Fuente de Call_DS1307 mientras
+                        ;; se completa la transmisión
+                        bclr PIEH,$01
+                        bclr CRGINT,$80
+                        ;; Definir RW_RTC                        
+                        bclr Banderas,$80   ;; Configurar RW_RTC = 0
+                        jsr CALL_DS1307
+                        ;; Habilitar RTI
+                        ;;bset CRGINT,$80
+
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
@@ -169,7 +190,7 @@ MAIN                    bra *
 ;; ==================== Subrutina IIC_ISR ====================================
 
                         ;; Borrar bandera de interrupción
-IIC_ISR                 bset IBSR,$01
+IIC_ISR                 bset IBSR,$02
 
                         ;; Verificar si bandera de RW_RTC está en 0
                         brclr Banderas,$80,IIC_write_isr
@@ -189,16 +210,22 @@ IIC_retornar            rti
 
 RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 
-                        tst Cont_Delay
+                        tst CONT_RTI
                         beq RTI_set_and_return
 
                         ;; No, decrementar y regresar
-                        dec Cont_Delay
+                        dec CONT_RTI
                         bra RTI_retornar
 
 RTI_set_and_return      ;; Cargar valor para un segundo
-                        movb #255 Cont_Delay
+                        movb #255 CONT_RTI ;; De momento estoy con 255 ms
 
+
+                        ;; Deshabilitar Fuente de Call_DS1307 mientras
+                        ;; se completa la transmisión
+                        bclr PIEH,$01
+                        bclr CRGINT,$80
+                        ;; Definir la bandera de RW_RTC
                         bset Banderas,$80
                         jsr CALL_DS1307
 
@@ -345,12 +372,17 @@ OC4_P2C                 ldy CONT_7SEG
 
 OC4_Retornar            rti
 
-;; ==================== Subrutina OC4_ISR ====================================
+;; ==================== Subrutina OC5_ISR ====================================
 
 OC5_ISR                 ldd TCNT
                         addd #100
                         std TC5
 
+                        rti
+
+;; ==================== Subrutina PH_ISR =====================================
+
+PH_ISR                  movb #$0F PIFH
                         rti
 
 ;; ===========================================================================
@@ -359,18 +391,12 @@ OC5_ISR                 ldd TCNT
 
 ;; ==================== CALL_DS1307 ==========================================
 
-CALL_DS1307             bset IBEN,$10
-
-                        brclr Banderas,$80,CD_prepare_wr
-
-                        movb DIR_RD,IBDR
-                        bra CD_return
+CALL_DS1307             bset IBCR,$10 ;; MODO TX
+                        bset IBCR,$20 ;; IBCR.5 = 1, START BIT
 
 CD_prepare_wr           movb DIR_WR,IBDR
 
-CD_return               bset IBEN,$20 ;; IBEN.5 = 1
-
-                        rts
+CD_return               rts
 
 ;; ==================== Subrutina READ_RTC ===================================                        
 
@@ -392,12 +418,12 @@ READ_RTC                ldaa Index_RTC
 
                         ;; Caso en que no es la tercera
                         ;; Verificar si es la última
-                        cmpa #9
+                        cmpa #10
                         beq RR_restore_settings
 
                         ;; Caso en que no es la última
                         ;; Verificar si es la penultima
-                        cmpa #8
+                        cmpa #9
                         beq RR_prepare_stop
                         
                         ;; En caso de que no, ir a get_data
@@ -409,35 +435,38 @@ RR_word_address         clr IBDR            ;; Mandar ADD de segundos
                         bra RR_inc_index
 
                         ;; Caso en donde es la segunda int
-RR_Started_repeat       bset IBEN,$04       ;; Poner repeated started
+RR_Started_repeat       bset IBCR,$04       ;; Poner repeated started
                         movb DIR_RD IBDR    ;; Calling Address de READ
 
                         bra RR_inc_index
 
                         ;; Caso en donde es la tercer int
-RR_Invert_txrx          bclr IBEN,$04       ;; Apagar repeated started
-                        bclr IBEN,$10       ;; Master en recepeción
-                        bclr IBEN,$08       ;; Enviar ACK en bit 9
+RR_Invert_txrx          bclr IBCR,$04       ;; Apagar repeated started
+                        bclr IBCR,$10       ;; Master en recepeción
+                        bclr IBCR,$08       ;; Enviar ACK en bit 9
 
                         ldaa IBDR           ;; Iniciar lectura dummy
 
                         bra RR_inc_index
 
                         ;; Caso en que es la última int
-RR_restore_settings     bclr IBEN,$08       ;; Habilitar ACK en TX * REVISAR
-                        bset IBEN,$10       ;; Master en Transmisión
+RR_restore_settings     bclr IBCR,$08       ;; Habilitar ACK en TX * REVISAR
+                        bset IBCR,$10       ;; Master en Transmisión
                         clr Index_RTC
-                        bclr IBEN,$20       ;; Mandar STOP
+                        bclr IBCR,$20       ;; Mandar STOP
+                        movb #$0F PIEH      ;; Re-habilitar puerto H
+
+                        bset CRGINT,$80     ;; Re-habilitar RTI
+                        bset PIEH,$01       ;; Re-habilitar PH0
 
                         bra RR_retornar
 
                         ;; Caso en que la transmisión es antepenultima
-                        bset IBEN,$08       ;; NO Enviar ACK en bit 9
+RR_prepare_stop         bset IBCR,$08       ;; NO Enviar ACK en bit 9
 
                         ;; Guardar los datos
 RR_get_data             suba #3
-                        ldx T_Read_RTC
-
+                        ldx #T_Read_RTC
                         ;; Inicia nueva secuencia
                         movb IBDR a,x         
 
@@ -445,10 +474,51 @@ RR_inc_index            inc Index_RTC
 
 RR_retornar             rts
                         
-
 ;; ==================== Subrutina WRITE_RTC ==================================                        
 
-WRITE_RTC               rts
+WRITE_RTC               ldaa Index_RTC
+
+                        ;; Verificar si es la primera interrupción
+                        cmpa #0
+                        beq WR_send_add
+
+                        ;; Verificar si era la última interrupción
+                        cmpa #8
+                        beq WR_last_int
+
+                        ;; Caso en donde NO es la primera interrupción
+                        ;; Ni tampoco la última
+                        ;; Enviar info desde el master al RTC
+                        ldx #T_Write_RTC
+                        suba #1
+                        movb a,x IBDR
+
+                        ;; Verificar si era la penúltima interrupcón
+                        cmpa #7
+                        beq WR_stopbit_int
+
+                        ;; Caso en que no era la última interrupción
+                        bra WR_inc_and_return
+
+WR_stopbit_int          ;; Caso en que era la última interrupción
+                        bclr IBCR,$20   ;; Transición 1->0 STOP SIGNAL
+
+                        bra WR_inc_and_return
+                        
+WR_last_int             ;; Caso en que era la última interrupción
+                        clr Index_RTC
+                        bset CRGINT,$80
+                        bset PIEH,$01
+
+                        bra WR_retornar
+
+WR_send_add             ;; Mandar add de segundo 00
+                        clr IBDR
+                        
+                        ;; Incrementar Index
+WR_inc_and_return       inc Index_RTC
+
+WR_retornar             rts
 
 ;; ==================== Subrutina BCD_7SEG ===================================
 ;; Descripción: Subrutina encargada actualizar los valores de DISPx.
