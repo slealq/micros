@@ -32,7 +32,7 @@ Main                    movb #$49 RTICTL
 
                         movb #$50 SPI0CR1
                         clr SPI0CR2
-                        movb #$45 SPI0BR
+                        movb #$45 SPI0BR        ;; 75khz -> 75kbit/s
 
                         bset DDRM,$40
                         bset PTM,$40
@@ -68,9 +68,9 @@ RTI_clr_contda          movw #$00 CONT_DA
                         eora #$01
                         staa PORTB
 
-RTI_clr_6               bclr PTM,$40
+RTI_clr_6               bclr PTM,$40        ;; Slave select = 0 (hay un negado)
 
-RTI_chk_ef              brset SPI0SR,$20,RTI_ld_rr1
+RTI_chk_ef              brset SPI0SR,$20,RTI_ld_rr1     ;; Esperar bandera de Transmission empty
 
                         bra RTI_chk_ef
 
@@ -78,21 +78,21 @@ RTI_ld_rr1              ldd CONT_DA
                         lsld
                         lsld
                         anda #$0F
-                        adda #$90
+                        adda #$90                       ;; Agregar código 9 en nibble superior -> Load DAC A
 
-                        staa SPI0DR
+                        staa SPI0DR                     ;; Enviar parte ALTA primero (Está en MSB first)
 
-RTI_chk_ef_2            brset SPI0SR,$20,RTI_ld_r2
+RTI_chk_ef_2            brset SPI0SR,$20,RTI_ld_r2      ;; Esperar a que la bandera de transmission empty se ponga
 
                         bra RTI_chk_ef_2
 
-RTI_ld_r2               stab SPI0DR
+RTI_ld_r2               stab SPI0DR                     ;; Enviar la parte baja
 
-RTI_chk_ef_3            brset SPI0SR,$20,RTI_clr_cs
+RTI_chk_ef_3            brset SPI0SR,$20,RTI_clr_cs     ;; Esperar a que la bandera de transmission empty se ponga de nuevo
 
                         bra RTI_chk_ef_3
 
-RTI_clr_cs              bset PTM,$40
-                        bset CRGFLG,$80
+RTI_clr_cs              bset PTM,$40        ;; Slave not select = 1 (hay un negado)
+                        bset CRGFLG,$80     ;; Borrar bandera de interrupt del RTI
 
                         rti 

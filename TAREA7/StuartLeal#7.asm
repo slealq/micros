@@ -60,8 +60,8 @@ T_Write_RTC:            db $00  ;; 0 segundos, activar CH=0
                         db %01001000 ;; 8 AM horas, 12 hour format
                         db $03  ;; Día número 3 (Miércoles) L:1, K:2, M:3
                         db $04  ;; Día número 4 del mes
-                        db $11  ;; Mes número 11
-                        db $13  ;; Año 19.
+                        db $12  ;; Mes número 12
+                        db $19  ;; Año 19.
 
     ;; Cambiar por valores a escribir
 T_Read_RTC:             ds 7
@@ -604,7 +604,7 @@ WRITE_RTC               ldaa Index_RTC
                         ;; Ni tampoco la última
                         ;; Enviar info desde el master al RTC
                         ldx #T_Write_RTC
-                        suba #1
+                        deca
                         movb a,x IBDR
 
                         ;; Verificar si era la penúltima interrupcón
