@@ -32,10 +32,13 @@
 ;;                       Código: PH7-PH6 = OFF-OFF
 ;;
 ;;  - Listado de las subrutinas (en orden):
+;;  - Subrutinas de atención de interrupciones
 ;;      + ATD0_ISR
 ;;      + TCNT_ISR
 ;;      + CALCULAR
+;;      + RTI_ISR
 ;;      + OC4_ISR
+;;  - Subrutinas generales
 ;;      + MUX_TECLADO
 ;;      + TAREA_TECLADO
 ;;      + FORMAR_ARRAY
@@ -43,16 +46,14 @@
 ;;      + PANT_CTRL
 ;;      + MODO_CONFIG
 ;;      + MODO_LIBRE
-;;      + BCD_BIN
+;;      + CONV_BIN_BCD
 ;;      + BIN_BCD
-;;      + Single_BIN_BCR
 ;;      + BCD_7SEG
 ;;      + DELAY
 ;;      + SEND
 ;;      + LCD
 ;;      + CARGAR_LCD
 ;;      + PATRON_LEDS
-;;      + CONV_BIN_BCD
 ;;  
 ;; ===========================================================================
 
