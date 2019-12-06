@@ -1,0 +1,569 @@
+\documentclass[12pt,letterpaper]{report} % Tipo de documento
+%%%%%%%%%%%
+% PREÁMBULO
+%%%%%%%%%%%
+
+% Paquetes de uso general
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Para escribir tildes y eñes
+\usepackage[utf8]{inputenc}                   		
+
+% Para títulos de figuras y otros en español
+\usepackage[spanish,es-noquoting]{babel} 
+	% Cambiar nombre a tablas                  		
+	\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+    % Cambiar nombre a lista de tablas
+	\addto\captionsspanish{\renewcommand{\listtablename}{Índice de tablas}}
+    % Cambiar nombre a capítulos
+	%\addto\captionsspanish{\renewcommand{\chaptername}{}}	
+    % Modificado por sleal 
+    % Quitar el número 1, 2, 3 etc y dejar solo el nombre:
+\usepackage{titlesec}
+\titleformat
+{\chapter} % command
+[hang] % shape
+{\bfseries\Huge} % format
+{\thechapter} % label
+{1ex} % sep
+{
+} % before-code
+[
+] % after-code
+
+% Tamaño del área de escritura de la página
+\usepackage{geometry}                         
+\usepackage{float}	\geometry{left=18mm,right=18mm,top=21mm,bottom=21mm} 	
+
+% Paquetes para matemáticas
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Paquetes ams, desarrollados por la American Mathematical Society y mejoran la escritura de fórmulas y símbolos matemáticos.
+\usepackage{amsmath}      
+\usepackage{amsfonts}     	
+\usepackage{amssymb}
+
+% Paquetes para gráficas
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% Para insertar gráficas
+\usepackage{graphicx}    
+
+% Para colocar varias subfiguras
+\usepackage[lofdepth,lotdepth]{subfig}	
+
+% Lenguaje para producir gráficos vectoriales
+\usepackage{tikz}
+
+\usepackage{listings} 	% Utilizado para manejar código 
+
+% Para crear circuitos eléctricos
+\usepackage[american]{circuitikz}
+
+% Paquetes de estilo y formato
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{codegreen}{rgb}{0,0.6,0} % Las siguientes cuatro líneas son utilizadas para el formato del código.
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle,
+    inputencoding = utf8,  % Input encoding
+    extendedchars = true,  % Extended ASCII
+    texcl         = true,  % Activate LaTeX commands in comments
+    %mathescape    = true   % Mathematical expressions between $
+    captionpos    = b,     % Caption position
+    literate      =        % Support additional characters
+      {á}{{\'a}}1  {é}{{\'e}}1  {í}{{\'i}}1 {ó}{{\'o}}1  {ú}{{\'u}}1
+      {Á}{{\'A}}1  {É}{{\'E}}1  {Í}{{\'I}}1 {Ó}{{\'O}}1  {Ú}{{\'U}}1
+      {à}{{\`a}}1  {è}{{\`e}}1  {ì}{{\`i}}1 {ò}{{\`o}}1  {ù}{{\`u}}1
+      {À}{{\`A}}1  {È}{{\'E}}1  {Ì}{{\`I}}1 {Ò}{{\`O}}1  {Ù}{{\`U}}1
+      {ä}{{\"a}}1  {ë}{{\"e}}1  {ï}{{\"i}}1 {ö}{{\"o}}1  {ü}{{\"u}}1
+      {Ä}{{\"A}}1  {Ë}{{\"E}}1  {Ï}{{\"I}}1 {Ö}{{\"O}}1  {Ü}{{\"U}}1
+      {â}{{\^a}}1  {ê}{{\^e}}1  {î}{{\^i}}1 {ô}{{\^o}}1  {û}{{\^u}}1
+      {Â}{{\^A}}1  {Ê}{{\^E}}1  {Î}{{\^I}}1 {Ô}{{\^O}}1  {Û}{{\^U}}1
+      {œ}{{\oe}}1  {Œ}{{\OE}}1  {æ}{{\ae}}1 {Æ}{{\AE}}1  {ß}{{\ss}}1
+      {ç}{{\c c}}1 {Ç}{{\c C}}1 {ø}{{\o}}1  {å}{{\r a}}1 {Å}{{\r A}}1
+      {ñ}{{\~n}}1  {Ñ}{{\~N}}1  {¿}{{?`}}1  {¡}{{!`}}1
+      % ¿ and ¡ are not correctly displayed if inconsolata font is used
+      % together with the lstlisting environment. Consider typing code in
+      % external files and using \lstinputlisting to display them instead.      
+  }  
+
+
+% Para cambiar la tipografía (si se desea)
+% Open Sans
+\usepackage[default,osfigures,scale=0.95]{opensans} %% 
+\usepackage[T1]{fontenc}
+% Gillius
+%\usepackage[T1]{fontenc}
+%\usepackage[default]{gillius}
+% Epigrafica
+%\usepackage{epigrafica}
+%\usepackage[LGR,OT1]{fontenc}
+% Alegreya
+%\usepackage[T1]{fontenc}
+%\usepackage[sfdefault]{AlegreyaSans} %% Option 'black' gives heavier bold face
+%% The 'sfdefault' option to make the base font sans serif
+%\renewcommand*\oldstylenums[1]{{\AlegreyaSansOsF #1}}
+
+% Para la presentación correcta de unidades
+\usepackage{siunitx}	  	
+
+% Para hipervínculos y marcadores
+\usepackage[colorlinks=true,urlcolor=blue,linkcolor=black,citecolor=green]{hyperref}     
+
+% Para ubicar las tablas y figuras justo después del texto
+\usepackage{float}	
+
+% Para hacer tablas más estilizadas
+\usepackage{booktabs}		
+
+% Estilo de la bibliografía
+\bibliographystyle{plain} 
+
+% Estilo de la página
+\pagestyle{plain} 
+
+% Estilo de numeración
+\pagenumbering{arabic}
+\usepackage{lastpage}
+
+% Para manejar los encabezados y pies de página
+\usepackage{fancyhdr}
+	% Contenido de los encabezados y pies de página
+	\pagestyle{fancy}				
+	\lhead{IE-0623 Microprocesadores}
+	\chead{}
+	\rhead{Proyecto Final}
+	\lfoot{Escuela de Ingeniería Eléctrica}
+	\cfoot{\thepage\ de \pageref{LastPage}}
+	\rfoot{Universidad de Costa Rica}
+
+\usepackage[utf8]{inputenc}
+\begin{document}
+\begin{titlepage}
+\begin{center}
+
+\textsc{\Large UNIVERSIDAD DE COSTA RICA}\\[2em]
+\textsc{\Large Escuela de Ingeniería Eléctrica}\\[2em]
+\textsc{\Large IE-0623 Microprocesadores}\\[5em]
+%Figura
+
+
+\vspace{4em}
+
+\textsc{\huge \textbf{Proyecto Final}}\\[2em]
+\textsc{\huge \textbf{RADAR 623}}\\[8em]
+
+
+\textsc{Realizado por}\\[1em]
+
+
+\textsc{ \large Stuart Leal Quesada B53777}\\[1em]
+
+
+\end{center}
+
+\vspace*{\fill}
+\textsc{San José, Costa Rica \hspace*{\fill} 2019}
+
+
+\end{titlepage}
+\section*{Resumen}
+Aquí va el resumen del trabajo escrito.
+%\end{abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+% Modificado por sleal 10/1/2017
+%\chapter{Nomenclatura.}
+
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ===================================================================================================== INTRODUCCIÓN ======================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+
+\chapter{Resumen}
+
+La introducción va aquí.
+\newpage
+
+
+
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ===================================================================================================== DESARROLLO ========================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+\chapter{Desarrollo}
+
+\section{Explicación general}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ATD_ISR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\subname}{ATD\_ISR}
+
+\section{Subrutina \subname}
+
+\subsection{Cálculos para interrupción \subname}
+En lo que respecta a esta interrupción, debemos realizar los cálculos para encontrar el valor de Presescalador que vamos a utilizar. La fórmula que relaciona la frecuencia con el valor del preescalador es la siguiente:
+
+\begin{equation}
+    frs = \frac{BUS\_CLK}{2\cdot(PRS + 1)}
+\end{equation}
+
+Para este caso, queremos la frecuencia más baja posible para este periférico, por tanto sería utilizar el valor más alto de PRS posible. Lo cuál corresponde a:
+
+\begin{equation}
+    PRS = 31 = \$1F
+\end{equation}
+
+\subsection{Configuración de \subname}
+Para el primer registro de control $ATD0CTL2$, queremos habilitar el módulo de conversiones con el bit $ADPU=1$, queremos habilitar la opción de $AFFC$, para que se borra la bandera de interrupción cuando se leen los registros de datos y también, habilitar las interrupciones con el bit $ASCIE=1$. Esto significa que:
+
+\begin{align*}
+    ATD0CTL2 = \$C2
+\end{align*} 
+
+Para el siguiente registro de control $ATDOCTL3$, queremos 6 conversiones, y además $FIFO=0$. Entonces tenemos que:
+
+\begin{align*}
+    ATD0CTL3 = \$30
+\end{align*} 
+
+En $ATD0CTL4$, vamos a querer configurar 4 periodos de reloj para el muestreo, y además $SRE8=1$ para tener conversiones a 8 bits. Además, vamos a querer el valor del preescalador en 31. Esto significa que:
+
+\begin{align*}
+    ATD0CTL4 = \$BF
+\end{align*} 
+
+Finalmente, tenemos que activar la justificación a la derecha, y las conversiones hacerlas sin signo ($DJM=1$ y $DSGN=0$). Además queremos configurar $SCAN=MULT=0$ para que se muestree sólo la entrada definida, 6 veces y se guarden los valores de $ADR0$ hasta $ADR5$. Y finalmente, queremos seleccionar la entrada 7 con los bits $CC$, $CB$ y $CA$. Entonces:
+
+\begin{align*}
+    ATD0CTL5 = \$87
+\end{align*} 
+
+\subsection{Vector de interrupción \subname}
+
+Finalmente, el vector de interrupción para ATD se encuentra en la dirección $\$3E52$.
+
+
+\subsection{Diagrama y explicación de la subrutina \subname}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% TCNT_ISR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\subname}{TCNT\_ISR}
+
+
+\section{Subrutina \subname}
+\subsection{Cálculos para interrupción \subname}
+\subsection{Configuración de \subname}
+\subsection{Vector de interrupción \subname}
+\subsection{Diagrama y explicación de la subrutina \subname}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CALCULAR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Subrutina CALCULAR}
+
+
+\subsection{Diagrama y explicación de la subrutina TCNT\_ISR}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% RTI_ISR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Subrutina RTI\_ISR}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OC4_ISR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Subrutina OC4\_ISR}
+
+
+\subsection{Cálculos para interrupción RTI\_ISR}
+
+Para esta subrutina, queremos que se ejecute cada 1ms. Entonces, tenemos la siguiente fórmula:
+
+\begin{equation}
+    T_{RTI} = \frac{(N+1)\cdot2^{M+9}}{OSC\_CLK}
+\end{equation}
+
+Haciendo un poco de retrospección, $OSC_CLK$ tiene un valor de $8MHz$, por lo que en el numerador necesitamos un número muy cercano a este valor. 
+
+Recordando que $2^{13} = 8192 \approx 8\cdot10^3$, entonces tendríamos que:
+
+\begin{align*}
+    T_{RTI} = \frac{(0+1)\cdot2^{4+9}}{8\cdot10^6} = 1.024ms
+\end{align*}
+
+Entonces, con $N=1$ y $M=4$ logramos nuestro objetivo.
+
+\subsection{Configuración de RTI\_ISR}
+
+La configuración para este periferico es bastante sencilla en realidad. Básicamente, lo primero es configurar el tiempo de $T_{RTI}$ con los valores calculados anteriormente. Esto sería:
+
+\begin{align*}
+    RTICTL = \$40
+\end{align*}
+
+Lo segundo, habilitar el puerto de RTI. Esto último se hace con la siguiente configuración:
+
+\begin{align*}
+    CRGINT = \$80
+\end{align*}
+
+\subsection{Vector de interrupción RTI\_ISR}
+
+El vector de interrupción se encuentra en la dirección $\$3E70$ para el Debug12.
+
+\subsection{Cálculos para interrupción OC4\_ISR}
+
+Tenemos que usar un Preescalador de 8 para la interrpución por overflow de $TCNT\_ISR$. Entonces, haciendo los cálculos para la cantidad de TICKS que tenemos que contar, para que $OC4\_ISR$ se ejecute con una frecuencia de $50kHz$ serían los siguiente: 
+
+\begin{equation}
+    TCS = \frac{20\mu s \cdot 24 MHz}{PRS}
+\end{equation}
+
+Esto significa entonces que, usando $PRS = 8$, encontramos que:
+
+\begin{align*}
+    TCS = 60
+\end{align*}
+
+Cada interrupción entonces, debemos cargar $TC4$ con $TCNT + 60$.
+
+\textbf{NOTA:} Para realizar cuentas de $1ms$ por ejemplo, debemos contar hasta 50.
+
+Cuentas de $100ms$ (Para llamar a $CONV\_BIN\_BCD$ y $BCD\_7SEG$) se realizan contando hasta 5000.
+
+Cuentas de $200ms$ (Para llamar a $PATRON\_LEDS$ y $ATD0\_CTL5$) se realizan contando hasta 10000.
+
+
+\subsection{Configuración de OC4\_ISR}
+
+Para el primer registro de configuración $TSCR1$, queremos habilitar el módulo de Timers (bit $TEN$) y además, queremos habilitar la bandera de $TFFCA$. 
+
+Esto quiere decir que, la bandera de $C4F$ se va a borrar cuando se escriba un dato en $TC4$, y además, la bandera de $TOF$ se va a borrar cuando se lea el registro de $TCNT$.
+
+Entonces, para este primer registro, tenemos que:
+
+\begin{align*}
+    TSCR1 = \$90
+\end{align*}
+
+Luego tenemos el segundo registro de control, $TSCR2$, en donda vamos a configurar el preescalador con el valor de 8. Esto significa guardar un 3 en los bits de PRS. Por lo tanto, tenemos que:
+
+\begin{align*}
+    TSCR2 = \$03
+\end{align*}
+
+\textbf{NOTA}: Para habilitar o deshabilitar las interrupciones por rebase, la configuración se hace por este mismo registro, en el bit 7 del registro. Sin embargo no están habilitadas por defecto. Sólo se habilitan cuando se está en el modo medición.
+
+Siguiendo con la configuración, para Output Compare, tenemos que habilitar la opción de output compare para el canal 4, en el registro de $TIOS$. Entonces, tenemos que:
+
+\begin{align*}
+    TIOS = \$10
+\end{align*}
+
+Y además, tenemos que habilitar la interrupción para cuando la bandera de $C4F$ se levanta. Esto se hace en el registro de configuración llamado $TIE$, en donde tenemos entonces que:
+
+\begin{align*}
+    TIE = \$10
+\end{align*}
+
+\subsection{Vector de interrupción OC4\_ISR}
+
+El vector de interrupción para $OC4\_ISR$ se encuentra en la dirección $\$3E66$.
+
+\subsection{Cálculos para TCNT\_ISR}
+Para esta interrupción, lo que debemos de calcular es el tiempo que toma entre una interrupción y otra. Esto se puede calcular con la siguiente fórmula:
+
+\begin{equation}
+    T_{TOI} = \frac{2^{16} \cdot 8}{24MHz} = \frac{1024}{46875} seg
+\end{equation}
+
+\subsection{Configuración de TCNT\_ISR}
+
+Para esta interrupción, la configuración del módulo de reloj ya se realizó previamente para $OC4\_ISR$. Para habilitar la interrupción en el modo medición, se hace escribiendo un 1 en el bit 7 del registro $TSCR2$. 
+
+Para deshabilitar la interrupción, se escribe un 0 en el mismo bit 7 de ese registro.
+
+\subsection{Vector de interrupción de TCNT\_ISR}
+
+El vector de interrupción para esta subrutina se encuentra en la dirección $\$3E5E$.
+
+
+\subsection{Cálculos para CALCULO - PH}
+
+Para realizar el cálculo de la velocidad, usamos la siguiente fórmula:
+
+\begin{equation}
+    VELOC = \frac{40m}{n_{ticks}} \cdot \frac{tick}{seg} \cdot \frac{seg}{hora} \cdot \frac{km}{metro} 
+\end{equation}
+
+Desarrollando lo anterior, tenemos que:
+
+\begin{align*}
+    VELOC &= \frac{40}{n_{ticks}} \cdot \frac{46875}{1024} \cdot \frac{3600}{1} \cdot \frac{1}{1000} \\ \\
+          &= \frac{25}{n_{ticks}} \cdot \frac{16875}{64} \\ \\ 
+          &= \frac{421875}{n_{ticks} \cdot 64}  
+\end{align*}
+    
+Entonces, la estrategia para realizar el cálculo de velocidad, será:
+
+\begin{itemize}
+    \item Realizar la multiplicación de $n_{ticks} \cdot 64$ y guardarlo en $X$.
+    \item Cargar en $D$ $\#200$, luego en $Y$ $\#16785$. Multiplicación queda en $Y:D$.
+    \item Dividir $Y:D$ entre $X$, y guardar el resultado en VELOC. 
+\end{itemize}
+
+\textbf{NOTA:} Hay que verificar que el resultado no sea más grande que $255$ (es posible si n es muy pequeño, como por ejemplo $n=1$ significa que $resultado = 6591$, lo cuál no es una velocidad con sentido. En caso de ser mayor a 255, guardar el máximo valor posible en VELOC (255).
+
+
+\subsection{Configuración para PH}
+
+Para hablitar todos los pines del puerto H como entradas, utilizamos el registro $DDRH$, escribiendo cero en todos los bits:
+
+\begin{align*}
+    DDRH = \$00
+\end{align*}
+
+Para habilitar las interrupciones para $PH3$ y $PH0$, utilizamos el registro $PIEH$:
+
+\begin{align}
+    PIEH = \$09
+\end{align}
+
+Para definir la activación con flanco decreciente, se pone en cero los bits 3 y 0 del registro $PPSH$:
+
+\begin{align*}
+    PPSH = \$F6
+\end{align*}
+
+Finalmente, para borrar todas las banderas de interrupción, en caso de que haya alguna en cola:
+
+\begin{align*}
+    PIFH = \$FF
+\end{align*}
+
+\subsection{Cálculos para PANT\_CTRL}
+Lo primero, para lograr que $TICK\_DIS$ llegue a cero en dos segundos, entonces tenemos que cargar:
+
+\begin{align*}
+    TICK\_DIS = 2seg \cdot \frac{46875}{1024} = 91.55 \approx 92
+\end{align*}
+
+Ahora, en general, dado una velocidad $VELOC$, la cantidad de ticks que debemos cargar en  contar para que el carro haya avanzado una distancia en metros DISTANCIA, se calcula de la siguiente manera:
+
+\begin{equation}
+    TICKS = \frac{DISTANCIA}{VELOC} \cdot \frac{1km}{1000m} \cdot \frac{3600s}{1h} \cdot \frac{46875}{1024}
+\end{equation}
+
+Ahora, particularmente, para calcular $TICK\_EN$, la $DISTANCIA = 60m$. Entonces tendríamos lo siguiente:
+
+\begin{align*}
+    TICK\_EN &= \frac{100m \cdot 1km \cdot 3600 \cdot 46875}{VELOC \cdot 1000m \cdot 1h \cdot 1024} \\ \\
+             &= \frac{16479.4921875}{VELOC} \\ \\ 
+             &\approx \frac{16480}{VELOC}
+\end{align*}
+
+Por otro lado, para calcular $TICK\_DIS$, simplemente es el doble de $TICK\_EN$. Es decir:
+
+\begin{align*}
+    TICK\_DIS &= \frac{32958.984375}{VELOC} \\ \\
+              &\approx \frac{32959}{VELOC}
+\end{align*}
+
+
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+% ===================================================================================================== CONCLUSIONES Y RECOMENDACIONES ====================================================================================
+% ============================================================================================================ ============================================================================================================
+% ============================================================================================================ ============================================================================================================
+\chapter{Conclusiones y recomendaciones}
+\section{Conclusiones}
+\section{Recomendaciones}
+
+%Agregar la bibliografía al indice
+
+\renewcommand{\refname}{Bibliografía}
+\addcontentsline{toc}{chapter}{Bibliografía}
+\begin{thebibliography}{}
+
+\bibitem{Art 1} Osorio M. (2011). \emph{Los robots basados en una arquitectura deliberativa y la toma de decisiones}. México: Revista saberes compartidos.
+
+\bibitem{Art 2} Urdiales C. \& Bandera A. \& Sandoval S. (2014). \emph{Historia y tendencias actuales de la robótica}. España: Editorial Universidad de Málaga.
+
+\bibitem{Art 3} Batle, J.A \& Barjau A. (2008). \emph{Holonomy in mobile robots}. España: Universidad de Catalunya, Barcelona. 
+
+\bibitem{Art 4} Oliveira, H. P., Sousa, A. J., Moreira, A. P., \& Costa, P. J. (2009). Modelado de robots omnidireccionales de 3 y 4 ruedas. Contemporary Robotics: Challenges and Solutions.
+
+\bibitem{Art 5} Carton Geek. (2016). Robot Omnidireccional. [online] Cartongeek.blogspot.com. Available at: http://cartongeek.blogspot.com/2016/02/robot-omnidireccional.html [Accessed 20 May 2017].
+
+\bibitem{Art 6} Muñoz V. \& Gil-Gómez G. \& García A. \emph{Modelado cinemático y dinámico de un robot móvil omni-direccional}. Málaga: Universidad de Málaga.
+
+\bibitem{Art 7} Barrero L. \& Villegas A. \& Gómez D.
+\emph{Robot transportador y distribuidor de objetos según su peso}. Redes ingeniería. Volumen 5.
+
+
+\bibitem{Art 8} Martínez S. \& Sisto R. \emph{Proyecto de Grado: Control y Comportamiento de Robots Omnidireccionales}. Instituto de Computación. Facultad de Ingeniería - Universidad de la República
+Montevideo. Available at: https://www.fing.edu.uy/inco/grupos/mina/pGrado/easyrobots/doc/SOA.pdf[Accessed 05 June 2017]
+\bibitem{Art 9} García D.(2012) 
+\emph{Modelado y Simulacion de un Robot Autónomo Omnidireccional}. Universidad Auntónoma de Querétaro. 
+\bibitem{Art 10} Barrero L. \& Villegas A. \& Gómez D. (2014)
+\emph{Robot Transportador Omnidireccional }. AMDM 2014.
+
+\bibitem{Art 11} Ramos E. \& Morales R. \& Silva R. (2010) \emph{Modelado, simulación y construcción de un robot móvil de ruedas tipo diferencial}. México: CIDETEC.
+
+\bibitem{Art 14} Rojas R. (2005) \emph{Omnidirectional Control}. Alemania: Freie Universitat Berlin.
+
+\bibitem{Art 12} Suárez A. \& Sánchez A. \emph{Plataforma Móvil omnidireccional de cuatro llantas suecas (Mecanum) en configuración AB}.  México: Universdad Autónoma de México.
+
+\bibitem{Art 13} V. F. Muñoz Martínez, \emph{Modelado cinemático y dinámico de un robot móvil omnidireccional}. Instituto Andaluz de Automática Avanzada y Robótica.
+
+\bibitem{Art 16} Autonomy Lab of Simon Fraser University, \emph{Moving or Sensing, Time and Energy}. Vancouver, Canada.
+
+\bibitem{Art 15}  Cornwell J. \emph{Mecánica Vectorial para Ingenieros DINÁMICA} Novena Edición.
+
+\bibitem{Art 17} Williams, R., Carter, B. , Gallina,  P., \& Rosati, G. (2002). \emph{Dynamic Model With Slip for Wheeled Omnidirectional Robots}. IEEE TRANSACTIONS ON ROBOTICS AND AUTOMATION, VOL. 18, NO. 3, JUNE 2002. 
+
+
+\end{thebibliography}
+% Agregar la línea para los apéndices
+\addcontentsline{toc}{chapter}{Apéndices}
+
+
+
+\end{document}
