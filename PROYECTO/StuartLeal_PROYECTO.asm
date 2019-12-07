@@ -1,6 +1,6 @@
 ;; ===========================================================================
 ;; Autor: Stuart Leal Quesada | B53777
-;; Fecha: 19 de noviembre de 2019
+;; Fecha: 9 de diciembre de 2019
 ;; Version: 1.0
 ;; Explicación:
 ;;
@@ -46,6 +46,7 @@
 ;;      + PANT_CTRL
 ;;      + MODO_CONFIG
 ;;      + MODO_LIBRE
+;;      + BCD_BIN
 ;;      + CONV_BIN_BCD
 ;;      + BIN_BCD
 ;;      + BCD_7SEG
