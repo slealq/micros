@@ -289,6 +289,23 @@ MN_After_10us           movb #$30 ATD0CTL3
 ;; ===========================================================================
 ;; ==================== PROGRAMA PRINCIPAL ===================================
 ;; ===========================================================================
+;; Descripción: Este es el programa principal, que maneja el modo en el que
+;;              se encuentra la aplicación.
+;; 
+;;  - Esta subrutina corre cíclicamente; Es decir, cuando termina vuelve a
+;;  empezar. La idea es que constantemente esté ejecutando las acciones que
+;;  corresponden al modo en que se encuentra la aplicación, sin que se 
+;;  quede 'bloqueado' en ningún modo. 
+;;
+;;  - Cuando se cambia de modo MEDICION a cualquier otro modo, se deberán
+;;  apagar los periféricos que no se usan en esos modos, tales como OC4 y
+;;  las interrupciones de key-wakeups.
+;;
+;;  - La bandera que indica si cambió el modo o no se calcula con dos bits
+;;  que se encuentran en la variable de Banderas, que guardan el modo anterior.
+;;  El modo anterior se entiende como el estado de los interruptores PH7 y PH6.
+;; 
+;; 
 
 MN2                     ;; Traer sólo los bits de estado de PTH y Banderas+1
                         ldaa Banderas+1
@@ -1855,6 +1872,7 @@ PT_LEDS_shift           ;; Guardar en A la parte baja de LEDS
                         ldab LEDS
                         aba
                         staa LEDS
+
 
                         bra PT_LEDS_retornar
 
