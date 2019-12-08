@@ -591,7 +591,10 @@ Calc_retornar           rti
 ;;  PARAMETROS DE ENTRADA: 
 ;;      - Cont_reb: Variable tipo byte en donde se guarda el multiplo de 1ms
 ;;                  a decrementas                    
-;;  PARAMETROS DE SALIDA: ninguno
+;;  PARAMETROS DE SALIDA:
+;;      - Cont_reb: Variable tipo byte en donde se guarda el multiplo de 1ms
+;;                  a decrementas
+;;  
 
 RTI_ISR                 bset CRGFLG,$80    ;; limpiar bander int
 
@@ -863,6 +866,7 @@ MX_return               rts
 ;;      - TECLA_IN: Se usa para guardar la tecla presionada inicialmente,
 ;;                  para comparar luego de un tiempo determinado (10-20ms) 
 ;;                  y saber si es la misma o no.
+;;
 
 TAREA_TECLADO           tst Cont_reb
                         bne TT_Return
@@ -910,6 +914,22 @@ TT_Set_tecla_lista      bset Banderas+1,$01   ;; TCL_LISTA <- 1
 TT_Return               rts                    
 
 ;; ==================== Subrutina FORMAR_ARRAY =============================== 
+;; Descripción: Subrutina que se encarga de guardar la secuencia de teclas
+;;              presionadas en el arreglo Num_Array.
+;; 
+;;  - Esta subrutina se encarga de implementar la lógica de borrado, de
+;;  enter, y de verificar que la cantidad de teclas presionadas no sea mayor
+;;  a la constante MAX_TCL.
+;; 
+;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE SALIDA: 
+;;      - Num_Array:    Esta subrutina guarda en orden, en este arreglo
+;;                      las teclas válidas que fueron presionadas.
+;       - ARRAY_OK:     Esta subrutina se encarga de poner en alto esta bandera
+;;                      para indicar a quién esté pendiente, que ya se
+;;                      terminó la secuencia de lectura del teclado. Esta
+;;                      bandera se encuentra en Banderas.2.
+;;
 
 FORMAR_ARRAY            ldab Cont_TCL
                         cmpb MAX_TCL
@@ -981,7 +1001,7 @@ FA_Last_Erase           dec Cont_TCL
 FA_Return               rts
 
 ;; ==================== Subrutina MODO_MEDICION ==============================
-;; Descripción: Subrutina que atiende el MODO_MEDICION, el modo activo del 
+;; Descripción: Subrutina que implementa el MODO_MEDICION, el modo activo del 
 ;;              RADAR.
 ;; 
 ;;  - Esta subrutina se encarga de manejar el control de los mensajes,
@@ -992,14 +1012,18 @@ FA_Return               rts
 ;;  velocidad sea != 0.
 ;; 
 ;;  PARAMETROS DE ENTRADA:
-;;      - V_LIM:      Esta subrutina utiliza el valor de V_LIM para determinar
+;;      - VELOC:      Esta subrutina utiliza el valor de VELOC para determinar
 ;;                    si tiene que llamar a la subrutina de PANT_CTRL o no.
 ;;  PARAMETROS DE SALIDA: 
 ;;      - LEDS:       En esta variable, se configura el LED correspondiente
 ;;                    que indica que se encuentra en este modo.
+;;      - BIN1:       Utiliza esta variable para controlar el contenido de uno
+;;                    de los displays de 7 segmentos.
+;;      - BIN2:       Utiliza esta variable para controlar el contenido de uno
+;;                    de los displays de 7 segmentos.
 ;;
 ;;  ESTADOS INTERNOS:
-;;      - Banderas.5: Esta bandera de STATE_CHANGE, es utilizada para verificar
+;;      - Banderas.5: Esta bandera de STATE_CHANGED, es utilizada para verificar
 ;;                    si es la primera vez que se ejecuta esta subrutina
 ;;                    después de haber estado en otro modo. En cuyo caso,
 ;;                    se tiene que habilitar las interrupciones por OVERFLOW
@@ -1065,19 +1089,26 @@ MM_retornar             rts
 ;;      realice otra medición durante la secuencia descrita anteriormente.
 ;; 
 ;;  PARAMETROS DE ENTRADA:
-;;      - V_LIM:      Esta subrutina utiliza el valor de V_LIM para determinar
-;;                    si tiene que llamar a la subrutina de PANT_CTRL o no.
-;;  PARAMETROS DE SALIDA: 
-;;      - LEDS:       En esta variable, se configura el LED correspondiente
-;;                    que indica que se encuentra en este modo.
+;;      - VELOC:      Esta subrutina utiliza el valor de VELOC para 
+;;                    determinar los valores de TICK_EN y TICK_DIS.
 ;;
-;;  ESTADOS INTERNOS:
-;;      - Banderas.5: Esta bandera de STATE_CHANGE, es utilizada para verificar
-;;                    si es la primera vez que se ejecuta esta subrutina
-;;                    después de haber estado en otro modo. En cuyo caso,
-;;                    se tiene que habilitar las interrupciones por OVERFLOW
-;;                    de TCNT, y las interrupciones de Key Wakeups del puerto
-;;                    H para el pin 3 y el pin 0.
+;;  PARAMETROS DE SALIDA: 
+;;      - BIN1:       Utiliza esta variable para controlar el contenido de 
+;;                    uno de los displays de 7 segmentos.
+;;      - BIN2:       Utiliza esta variable para controlar el contenido de 
+;;                    uno de los displays de 7 segmentos.
+;;      - TICK_EN:    Esta variable se utiliza en la subrutina de TCNT_ISR 
+;;                    para determinar cuando se tiene que encender la bandera 
+;;                    PANT_FLAG.
+;;      - TICK_DIS:   Esta variable se utiliza en la subrutina de TCNT_ISR 
+;;                    para determinar cuando se tiene que apagar la bandera 
+;;                    PANT_FLAG.
+;;      - Banderas.10 Esta bandera indica si se deben realizar los cálculos
+;;                    de  ticks y de ALERTA y OUT_RANGE o no.
+;;      - Banderas.9  Esta bandera indica si la velocidad está fuera del 
+;;                    rango o no.
+;;      - Banderas.4  Esta bandera indica si se tiene que encender la alera 
+;;                    o no. Depende de la velocidad del vehículo.
 ;; 
 
 PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
@@ -1201,7 +1232,13 @@ PTC_retornar            rts
 ;;  la respuesta sea sí, se guarda el valor válido en la variable V_LIM como
 ;;  una variable en binario.
 ;; 
-;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE ENTRADA: 
+;;      - Banderas.2: Esta es la bandera de ARRAY_OK, y esta subrutina se
+;;                    encarga de modificar esta bandera, para forzar a 
+;;                    TAREA_TECLADO a volver a iniciar el proceso de leer
+;;                    teclas.
+;;      - Banderas.5: Esta bandera indica si el estado cambio. Es decir,
+;;                    esta es la primera vez que se entra a MODO_CONFIG.
 ;;  PARAMETROS DE SALIDA: 
 ;;      - V_LIM:      Esta subrutina es la encargada de definir V_LIM, y
 ;;                    verificar que el valor está en un rango permitido.
@@ -1209,13 +1246,6 @@ PTC_retornar            rts
 ;;      - BIN1:       El valor actual de V_LIM se guarda en BIN1 cuando
 ;;                    el programa se encuentra en MODO_CONFIG, para que el
 ;;                    usuario lo pueda ver.
-;;  ESTADOS INTERNOS:
-;;      - Banderas.2: Esta es la bandera de ARRAY_OK, y esta subrutina se
-;;                    encarga de modificar esta bandera, para forzar a 
-;;                    TAREA_TECLADO a volver a iniciar el proceso de leer
-;;                    teclas.
-;;      - Banderas.5: Esta bandera indica si el estado cambio. Es decir,
-;;                    esta es la primera vez que se entra a MODO_CONFIG.
 ;;
 
                         ;; Verificar si esta es la primera vez que se
@@ -1328,6 +1358,20 @@ MODO_LIBRE              brclr Banderas+1,$20,ML_retornar
 ML_retornar             rts                        
 
 ;; ==================== Subrutina BCD_BIN ==================================== 
+;; Descripción: Subrutina que convierte el valor de Num_Array a binario, y
+;;              lo guarda en V_LIM.
+;; 
+;   - Esta subrutina sólo funciona para el caso en donde MAX_TCL = 2. Ya que
+;;  en caso de no ser así, el valor podría ser mayor a 255 y esto no se
+;;  contempla en esta subrutina.
+;; 
+;;  PARAMETROS DE ENTRADA: 
+;;      - Num_Array:  Esta subrutina lee el valor en BCD que está guardado
+;;                    a partir de la dirección de Num_Array.
+;;  PARAMETROS DE SALIDA: 
+;;      - V_LIM:      Esta subrutina convierte el valor en BCD que está en
+;;                    Num_Array, y lo guarda en binario en la variable V_LIM.
+;;
 
 BCD_BIN                 ldx #Num_Array
                         clra
@@ -1564,6 +1608,20 @@ BCD_7SEG                ldaa BCD2
 BCD_7s_return           rts
 
 ;; ==================== Subrutina DELAY ====================================== 
+;; Descripción: Subrutina que realiza un bloqueo por una cierta cantidad de
+;;              tiempo.
+;; 
+;;  - La subrutina espera hasta que la variable Cont_Delay sea cero para
+;;  retornar.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - Cont_Delay:   Esta variable es decrementada por la subrutina
+;;                      OC4_ISR. Esta subrutina se espera hasta que el valor
+;;                      de esta variable sea cero, lo cuál significará que el
+;;                      programa se esperará una cierta cantidad de tiempo
+;;                           
+;;  PARAMETROS DE SALIDA: ninguno.
+;;
 
 DELAY                   tst Cont_Delay
                         beq DE_return
@@ -1573,6 +1631,23 @@ DELAY                   tst Cont_Delay
 DE_return               rts                               
 
 ;; ==================== Subrutina SEND ======================================= 
+;; Descripción: Subrutina utilizada para enviar un comando o un dato al 
+;;              periférico de LCD. 
+;;
+;;  - Con la bandera de SEND_CMD or SEND_DATA (Banderas.8), esta subrutina
+;;  envía el contenido de R1 al display LCD, primero envíando el nibble
+;;  superior, y luego el nibble inferior.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - R1:           Por el registro R1, se pasa tanto el nibble superior
+;;                      como el nibble inferior de el dato o el comando que 
+;;                      se va a enviar.
+;;      - Banderas.8:   Bandera que indica si se va a enviar un comando o 
+;;                      se va a enviar un dato. 0 significa comando, y 
+;;                      1 significa dato.
+;;                           
+;;  PARAMETROS DE SALIDA: ninguno.
+;;
 
 SEND                    psha
                         anda #$F0
@@ -1619,6 +1694,25 @@ SE_cmd_l_en             bset PORTK,$02
                         rts           
 
 ;; ==================== Subrutina LCD ========================================
+;; Descripción: Subrutina que se encarga de configurar el periférico de la
+;;              pantalla LCD, enviando la secuencia de comandos
+;;              para inicialización.
+;;
+;;  - Esta subrutina se encarga de enviar todos los bytes de la tabla 
+;;  iniDISP, y posteriormente, limpia la pantalla LCD, y pone el mensaje
+;;  apuntado por los registros J y K. (J para la línea superior y K para la
+;;  línea inferior).
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - J:            Por medio de este registro se pasa la dirección del
+;;                      la tabla que contiene los caractéres a escribir
+;;                      en la primera línea del LCD.
+;;      - K:            Por medio de este registro se pasa la dirección del
+;;                      la tabla que contiene los caractéres a escribir
+;;                      en la segunda línea del LCD.
+;;                           
+;;  PARAMETROS DE SALIDA: ninguno.
+;;
 
 LCD                     pshx
                         ldab #1
@@ -1659,7 +1753,25 @@ LC_clr                  ldaa Clear_LCD
                         rts      
 
 ;; ==================== Subrutina CARGAR_LCD =================================
-
+;; Descripción: Esta subrutina se encarga de enviar todos los datos de
+;;              dos tablas al periférico LCD. Las dos tablas corresponden a 
+;;              la primera línea y a la segunda línea.
+;;
+;;  - La subruina se encargará de llamar a la subrutina SEND para enviar
+;;  un byte de datos a la vez. Además, se encargará de realizar los
+;;  DELAYs correspondientes para cada envío de datos, y realizar el cambio
+;;  de línea con las constantes ADD_L1 y ADD_L2, cuando corresponda.
+;; 
+;;  PARAMETROS DE ENTRADA:
+;;      - J:            Por medio de este registro se pasa la dirección del
+;;                      la tabla que contiene los caractéres a escribir
+;;                      en la primera línea del LCD.
+;;      - K:            Por medio de este registro se pasa la dirección del
+;;                      la tabla que contiene los caractéres a escribir
+;;                      en la segunda línea del LCD.
+;;                           
+;;  PARAMETROS DE SALIDA: ninguno.
+;;
 CARGAR_LCD              ldaa ADD_L1
                         bclr Banderas,$01
 
@@ -1713,7 +1825,7 @@ CLCD_return             rts
 ;; ==================== Subrutina PATRON_LEDS =================================
 ;; Descripción: Subrutina para manejar los LEDS de Alerta.
 ;; 
-;;  - Cuando la bandera de ALERTA (bit 5 de Banderas) está en 1, cada vez
+;;  - Cuando la bandera de ALERTA (bit 4 de Banderas) está en 1, cada vez
 ;;  que se llame a esta subrutina, barrera los leds del 7 al 3, de izquierda
 ;;  a derecha. Sin embargo, si ALERTA está en 0, esta subrutina borrará los
 ;;  LEDS del 7 al 3.
