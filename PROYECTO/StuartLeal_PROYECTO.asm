@@ -88,10 +88,17 @@ MAX_BRILLO:             equ 20
 ;;                      Banderas.13 : --            $20
 ;;                      Banderas.14 : --            $40
 ;;                      Banderas.15 : PH3_FIRED     $80
-Banderas:               dw 1
+Banderas:               ds 2
 ;;                      Variables para MODO_CONFIG
 V_LIM:                  ds 1
 ;;                      Variables para TAREA_TECLADO
+MAX_TCL:                db 2        ;; Set de valor MAX_TCL
+Tecla:                  ds 1
+Tecla_in:               ds 1
+Cont_reb:               ds 1
+Cont_TCL:               ds 1
+Patron:                 ds 1
+Num_Array:              ds 6
 ;;                      Variables para ATD_ISR
 BRILLO:                 ds 1
 POT:                    ds 1
@@ -100,42 +107,30 @@ TICK_EN:                ds 2
 TICK_DIS:               ds 2
 ;;                      Variables para CALCULAR
 VELOC:                  ds 1
-TEMP:                   ds 1
-TEMP2:                  ds 1
-Reb_shot                ds 1
 ;;                      Variables para TCNT_ISR
 TICK_VEL:               ds 1
 ;;                      Variables para CONV_BIN_BCD
+BIN1:                   ds 1
+BIN2:                   ds 1
+BCD1:                   ds 1
+BCD2:                   ds 1
 ;;                      Variables para BIN_BCD
 BCD_L:                  ds 1
 BCD_H:                  ds 1      
-;;                      Variables para BCD_7SEG    
-;;                      Variables para PATRON_LEDS  
+;;                      Variables para BCD_7SEG  
+DISP1:                  ds 1
+DISP2:                  ds 1
+DISP3:                  ds 1
+DISP4:                  ds 1
+;;                      Variables para PATRON_LEDS
+LEDS:                   ds 1
 ;;                      Variables para OC4_ISR
 CONT_DIG:               ds 1
 CONT_TICKS:             ds 1
 DT:                     ds 1
-CONT_7SEG:              dw 1                  
-CONT_200:               dw 1                  
-;;                      Variables viejas
-MAX_TCL:                db 2        ;; Set de valor MAX_TCL
-Tecla:                  ds 1
-Tecla_in:               ds 1
-Cont_reb:               ds 1
-Cont_TCL:               ds 1
-Patron:                 ds 1
-VMAX:                   db 250
-TIMER_CUENTA:           ds 1
-LEDS:                   db 1
-BIN1:                   ds 1
-BIN2:                   ds 1
-LOW:                    ds 1
-BCD1:                   ds 1
-BCD2:                   ds 1
-DISP1:                  db 1
-DISP2:                  db 1
-DISP3:                  db 1
-DISP4:                  db 1
+CONT_7SEG:              ds 2                  
+CONT_200:               ds 2
+;;                      Variables para Subrutinas LCD                  
 Cont_Delay:             ds 1
 D2ms:                   db 100
 D260us:                 db 13
@@ -143,9 +138,7 @@ D40us:                  db 2
 Clear_LCD:              db $01
 ADD_L1:                 db $80
 ADD_L2:                 db $C0
-
-Num_Array:              ds 6
-
+;;                      Tablas
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 
 SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$40,$00
@@ -181,8 +174,6 @@ MODO_LIB_L1:            fcc '  RADAR   623'
 
 MODO_LIB_L2:            fcc '  MODO LIBRE'      
                         db EOM                  
-
-
 
 ;; ===========================================================================
 ;; ==================== DECLARACION DE INTERRUPCIONES ========================
@@ -386,7 +377,7 @@ fin                     bra *
 ;;      - POT: Variable tipo byte, sin signo donde se almacena el valor
 ;;             del POT, como un valor de 0 a 255.
 ;;
-;;      - BRILLO: Variable tipo byte, con un valor de 0 a 100. Define el
+;;      - BRILLO: Variable tipo byte, con un valor de 0 a 20. Define el
 ;;                brillo de la pantalla.             
 ;;
 
@@ -417,11 +408,15 @@ ATD0_ISR                 ;; sumar todos los datos
 ;; ==================== Subrutina TCNT_ISR ===================================
 ;; Descripción: Subrutina de interrupción para el Overflow de TCNT.
 ;; 
-;;  - Con esta subrutina, CALCULO realiza los cálculos de velocidad, mediante
-;;  el uso la variable TICK_VEL.
-;;  Además, se realiza el conteo de tiempo para encender el DISPLAY con el
-;;  mensaje adecuado, de acuerdo a la posición del vehículo, utilizando las
-;;  variables TICK_EN y TICK_DIS.
+;;  - Con esta subrutina, la subrutina CALCULO realiza los cálculos de 
+;;  velocidad, mediante la variable TICK_VEL. Esta variable se incremente
+;;  con cada interrupción, por tanto, dado la cadencia de esta subrutina, 
+;;  se puede terminar el tiempo entre S1 y S2, y calcular la velocidad
+;;  del vehículo.
+;;
+;;  Además, se realiza el conteo de tiempo para encender y apagar el DISPLAY 
+;;  con el mensaje adecuado, de acuerdo a la posición del vehículo, utilizando 
+;;  las variables TICK_EN y TICK_DIS.
 ;;
 ;;  Consideraciones: Como TICK_DIS > TICK_EN, entonces se asume que SIEMPRE
 ;;  que TICK_EN != 0, TICK_DIS también va a ser != 0. 
@@ -433,8 +428,6 @@ ATD0_ISR                 ;; sumar todos los datos
 ;;                   encender el DISPLAY para indicar la velocidad al usuario.
 ;;                   Si la bandera está en cero, se debe apagar el display,
 ;;                   pues se calcula que el usuario ya pasó por el letrero.
-;;      - VELOC:     Indica la velocidad calculada. Esta interrupción borra
-;;                   esta variable cuando TICK_EN = TICK_DIS = 0
 ;;                        
 
 TCNT_ISR                ;; incrementar velocidad, mientras sea menor a 255
@@ -504,8 +497,7 @@ TCNT_retornar           ldd TCNT
 ;;                   guarda el resultado en VELOC.
 ;; 
 
-CALCULAR                ;;movb Cont_reb Reb_shot                  ;; BORRAR
-                        tst Cont_reb
+CALCULAR                tst Cont_reb
                         bne Calc_rst_and_return
 
                         brset PIFH,$08,Calc_rst_tick_vel
@@ -521,7 +513,6 @@ Calc_rst_tick_vel       ;; caso de PH3
                         brset Banderas,$80,Calc_rst_ph3
 
                         ;; Caso donde es la primera vez, activar PH3_FIRED
-                        ;;inc BIN2                            ;; BORRAR
                         clr TICK_VEL
                         bset Banderas,$80
 
@@ -549,11 +540,8 @@ Calc_veloc              ;; caso de PH0
                         ;; Habilitar interrupciones para el puerto H
                         movb #$09 PIEH
 
-                        ;;inc BIN1                        ;; BORRAR
-
                         ;; calcular denominador
                         ldaa TICK_VEL
-                        ;;staa TEMP                       ;; BORRAR
                         ldab #64
                         mul
                         tfr d,x
@@ -580,9 +568,6 @@ Calc_set_max_veloc      ;; caso veloc > 255, guardar tope
                         movb #255 VELOC
 
 Calc_reset_bandera      bclr Banderas,$80
-
-                        ;;movb VELOC,TEMP2                ;; BORRAR
-                        ;;movb VELOC,LEDS                 ;; BORRAR
 
 Calc_reset_ph0          bset PIFH,$01
 
