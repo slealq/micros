@@ -86,7 +86,7 @@ MAX_BRILLO:             equ 20
 ;;                      Banderas.11 : --            $08
 ;;                      Banderas.12 : --            $10
 ;;                      Banderas.13 : --            $20
-;;                      Banderas.14 : --            $40
+;;                      Banderas.14 : OPPOS_DIR     $40
 ;;                      Banderas.15 : PH3_FIRED     $80
 Banderas:               ds 2
 ;;                      Variables para MODO_CONFIG
@@ -526,6 +526,9 @@ Calc_rst_and_return     movb #$FF PIFH
                         bra Calc_retornar
 
 Calc_rst_tick_vel       ;; caso de PH3
+                        ;; Verificar que no haya sido OPPOS_DIR previamente
+                        brset Banderas,$40,Calc_rst_opposdir
+
                         ;; Verificar si PH3_FIRED ya fué activada
                         brset Banderas,$80,Calc_rst_ph3
 
@@ -533,13 +536,20 @@ Calc_rst_tick_vel       ;; caso de PH3
                         clr TICK_VEL
                         bset Banderas,$80
 
+                        bra Calc_rst_ph3
+
+                        ;; Caso donde vehículo en dirección opuesta pasa por
+                        ;; S1
+Calc_rst_opposdir       bclr Banderas,$40   ;; Limpiar OPPOS_DIR
+
                         ;; Ya se había activado PH3_FIRED previamente
 Calc_rst_ph3            bset PIFH,$08
 
                         bra Calc_set_cntr
 
 Calc_veloc              ;; caso de PH0
-                        brclr Banderas,$80,Calc_reset_ph0
+                        ;; Verificar si ya PH_FIRED está en 1
+                        brclr Banderas,$80,Calc_set_opposdir
 
                         ;; Deshabilitar interrupciones para el puerto H
                         clr PIEH
@@ -585,6 +595,10 @@ Calc_set_max_veloc      ;; caso veloc > 255, guardar tope
                         movb #255 VELOC
 
 Calc_reset_bandera      bclr Banderas,$80
+                        bra Calc_reset_ph0
+
+Calc_set_opposdir       ;; Caso en donde vehículo va en dirección opuesta
+                        bset Banderas,$40                        
 
 Calc_reset_ph0          bset PIFH,$01
 
