@@ -844,19 +844,12 @@ Mx_DF                   movb #$DF PORTA
 
 Mx_BF                   movb #$BF PORTA                                                                        
 
-                        ;; Los nops son para dar tiempo entre cuando se
+                        ;; Dar tiempo entre cuando se
                         ;; escribe la parte alta, y cuando se lee la parte
                         ;; baja. Se encontraron errores en donde la lectura
                         ;; de la parte baja arrojaba basura.
-Mx_COMP                 nop
-                        nop
-                        nop 
-                        nop
-                        nop 
-                        nop
-                        nop 
-                        nop
-                        nop 
+Mx_COMP                 ldaa #10
+Mx_wait                 dbne a,Mx_wait
 
                         brclr PORTA,$01,MX_col0
                         brclr PORTA,$02,MX_col1
