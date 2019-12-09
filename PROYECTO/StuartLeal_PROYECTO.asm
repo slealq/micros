@@ -1182,6 +1182,8 @@ PANT_CTRL               ;; Deshabilitar interrupciones en puerto H
                         bclr Banderas,$04 ;; Borrar bandera de OUT_RANGE
                         bset Banderas,$02 ;; Poner CALC_TICKS = 1
                         bclr Banderas+1,$10 ;; Ponert ALERTA = 0
+                        bclr Banderas,$40 ;; Borrar OPPOS_DIR
+                        bclr Banderas,$80 ;; Borrar PH3_FIRED
 
                         bra PTC_retornar
 
