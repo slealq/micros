@@ -98,7 +98,7 @@ Tecla_in:               ds 1
 Cont_reb:               ds 1
 Cont_TCL:               ds 1
 Patron:                 ds 1
-Num_Array:              ds 6
+Num_Array:              ds 2
 ;;                      Variables para ATD_ISR
 BRILLO:                 ds 1
 POT:                    ds 1
@@ -139,12 +139,16 @@ Clear_LCD:              db $01
 ADD_L1:                 db $80
 ADD_L2:                 db $C0
 ;;                      Tablas
+                        org $1030
 Teclas:                 db $01,$02,$03,$04,$05,$06,$07,$08,$09,$0B,$0,$0E
 
+                        org $1040
 SEGMENT:                db $3F,$06,$5B,$4F,$66,$6D,$7D,$07,$7F,$6F,$40,$00
 
+                        org $1050
 iniDISP:                db $04,$28,$28,$06,$0C
 
+                        org $1060
 iniMensajes:
 ;;                      Mensajes de configuración
 CONFIG_L1:              fcc '  MODO CONFIG'
