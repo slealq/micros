@@ -421,13 +421,26 @@ ATD0_ISR                 ;; sumar todos los datos
 ;;  Consideraciones: Como TICK_DIS > TICK_EN, entonces se asume que SIEMPRE
 ;;  que TICK_EN != 0, TICK_DIS también va a ser != 0. 
 ;; 
-;;  PARAMETROS DE ENTRADA: ninguno
+;;  PARAMETROS DE ENTRADA:
+;;      - TICK_EN:   Variable decrementada periódicamente en esta subrutina,
+;;                   utilizada para determinar el momento en el que se debe
+;;                   de MOSTRAR el mensaje de velocidad en  la pantalla LCD. 
+;;                   (Cuando la variable llega a 0).
+;;
+;;      - TICK_DIS:  Variable decrementada periódicamente en esta subrutina,
+;;                   utilizada para determinar el momento en el que se debe
+;;                   de QUITAR el mensaje de velocidad en  la pantalla LCD. 
+;;                   (Cuando la variable llega a 0).
+;;
 ;;  PARAMETROS DE SALIDA: 
 ;;      - PANT_FLAG: Bit 3 del registro de Banderas.
 ;;                   Si la bandera está en uno, quiere decir que se debe
 ;;                   encender el DISPLAY para indicar la velocidad al usuario.
 ;;                   Si la bandera está en cero, se debe apagar el display,
 ;;                   pues se calcula que el usuario ya pasó por el letrero.
+;;
+;;      - TICK_VEL:  Contador utilizado para calcular la velocidad de los
+;;                   vehículos.
 ;;                        
 
 TCNT_ISR                ;; incrementar velocidad, mientras sea menor a 255
